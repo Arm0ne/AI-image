@@ -28,9 +28,33 @@ export default function IndexPage() {
 
     return (
         <main className="relative h-full overflow-y-auto text-stone-950 dark:text-stone-100">
+            <div className="pointer-events-none fixed inset-0 bg-[#0D1117]" style={{ zIndex: -10 }} />
             <ParticleCanvas />
-            <div className="pointer-events-none absolute inset-0 -z-10 bg-[#050507]" />
             <section className="relative mx-auto min-h-[calc(100vh-4rem)] max-w-7xl overflow-hidden px-6">
+                <div
+                    className="pointer-events-none absolute"
+                    style={{
+                        zIndex: 0,
+                        left: '50%',
+                        top: '35%',
+                        width: '700px',
+                        height: '700px',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'radial-gradient(circle, rgba(245, 166, 35, 0.28) 0%, rgba(245, 166, 35, 0) 70%)'
+                    }}
+                />
+                <div
+                    className="pointer-events-none absolute"
+                    style={{
+                        zIndex: 0,
+                        left: '65%',
+                        top: '55%',
+                        width: '600px',
+                        height: '600px',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'radial-gradient(circle, rgba(91, 155, 213, 0.22) 0%, rgba(91, 155, 213, 0) 70%)'
+                    }}
+                />
                 <div className="relative flex min-h-[620px] flex-col items-center justify-center pt-16 text-center">
                     <div className="min-h-[16rem] sm:min-h-[20rem] lg:min-h-[24rem]">
                         <TypewriterText

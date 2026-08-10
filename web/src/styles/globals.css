@@ -141,6 +141,15 @@
 }
 
 @layer utilities {
+    /* 覆盖 antd 的全局链接样式 */
+    header a.text-stone-400 {
+        color: #a8a29e !important;
+    }
+
+    header a.text-stone-400:hover {
+        color: #f5f5f4 !important;
+    }
+
     .ai-title-aurora {
         background: linear-gradient(90deg, #111827 0%, #111827 36%, #6b7280 54%, #111827 72%, #111827 100%);
         background-size: 220% 100%;
@@ -155,6 +164,7 @@
         background-size: 220% 100%;
         -webkit-background-clip: text;
         background-clip: text;
+        color: transparent;
     }
 
     @keyframes ai-title-aurora {
