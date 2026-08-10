@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
 
 import { navigationTools } from "@/constant/navigation-tools";
+import { TypewriterText } from "@/components/typewriter-text";
 
 function Highlighter({ action, color, children }: { action: "highlight" | "underline"; color: string; children?: ReactNode }) {
     return (
@@ -30,11 +31,16 @@ export default function IndexPage() {
                 <div className="pointer-events-none absolute left-[15%] top-24 size-20 rounded-full border border-dashed border-stone-200 dark:border-stone-800" />
                 <div className="pointer-events-none absolute right-[23%] top-[48%] size-20 rounded-full border border-dashed border-stone-200 dark:border-stone-800" />
 
-                <div className="relative flex min-h-[620px] flex-col items-center justify-center pt-10 text-center">
-                    <h1 className="ai-title-aurora max-w-5xl text-balance text-5xl font-semibold tracking-normal sm:text-7xl lg:text-8xl">{t("meta.title")}</h1>
-                    <p className="mt-8 max-w-3xl text-balance text-lg leading-8 text-stone-500 dark:text-stone-400">
-                        <Trans i18nKey="home.description" components={{ canvas: <Highlighter action="underline" color="#FF9800" />, content: <Highlighter action="highlight" color="#87CEFA" /> }} />
-                    </p>
+                <div className="relative flex min-h-[620px] flex-col items-center justify-center pt-16 text-center">
+                    <div className="min-h-[16rem] sm:min-h-[20rem] lg:min-h-[24rem]">
+                        <TypewriterText
+                            strings={[
+                                "发挥你的<span style='color:#FF9800'>创造力</span>，<br/>构建<span style='color:#87CEFA'>无限的可能</span>。",
+                                "让每一个<span style='color:#FF9800'>TOKEN</span>，<br/>都有<span style='color:#87CEFA'>价值</span>。"
+                            ]}
+                            className="ai-title-aurora inline-block max-w-5xl text-balance text-5xl font-semibold leading-snug tracking-normal sm:text-7xl sm:leading-snug lg:text-8xl lg:leading-snug"
+                        />
+                    </div>
                     <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
                         <Button type="primary" size="large" onClick={() => navigate(`/${primaryTool.slug}`)} icon={<ArrowRight className="size-4" />} iconPlacement="end">
                             {t("home.start")}
