@@ -7,7 +7,7 @@
 scp -r D:\无限画布 user@your-server:/path/to/
 
 # 或使用 Git
-git clone https://github.com/basketikun/infinite-canvas.git
+git clone https://github.com/Arm0ne/infinite-canvas.git
 cd infinite-canvas
 git checkout custom
 

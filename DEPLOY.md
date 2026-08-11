@@ -26,7 +26,7 @@ sudo systemctl enable docker
 
 ```bash
 # 在服务器上克隆仓库
-git clone https://github.com/basketikun/infinite-canvas.git
+git clone https://github.com/Arm0ne/infinite-canvas.git
 cd infinite-canvas
 
 # 切换到 custom 分支
