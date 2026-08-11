@@ -64,10 +64,10 @@ export type ConfigTabKey = "channels" | "preferences" | "webdav" | "local-storag
 
 export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
 const CHANNEL_MODEL_SEPARATOR = "::";
-const OPENAI_BASE_URL = "https://api.openai.com";
-const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
-const GROK_BASE_URL = "https://api.x.ai/v1";
-const SEEDANCE_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
+const OPENAI_BASE_URL = "https://api.panlai.me";
+const GEMINI_BASE_URL = "https://api.panlai.me";
+const GROK_BASE_URL = "https://api.panlai.me";
+const SEEDANCE_BASE_URL = "https://api.panlai.me";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
