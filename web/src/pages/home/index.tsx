@@ -66,11 +66,11 @@ export default function IndexPage() {
                         />
                     </div>
                     <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-                        <Button type="primary" size="large" onClick={() => navigate(`/${primaryTool.slug}`)} icon={<ArrowRight className="size-4" />} iconPlacement="end">
-                            {t("home.start")}
-                        </Button>
-                        <Button size="large" onClick={() => navigate("/canvas")}>
+                        <Button type="primary" size="large" onClick={() => navigate("/canvas")} icon={<ArrowRight className="size-4" />} iconPlacement="end">
                             {t("home.openCanvas")}
+                        </Button>
+                        <Button size="large" onClick={() => navigate("/image")}>
+                            {t("home.openImageWorkbench")}
                         </Button>
                     </div>
                 </div>

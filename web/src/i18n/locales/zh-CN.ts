@@ -315,6 +315,7 @@ export default {
         description: "在 <canvas>无限画布</canvas> 中生成、连接和重组 <content>图片、文字与图形</content>，让创作从单次生成变成连续推演。",
         start: "开始使用",
         openCanvas: "打开画布",
+        openImageWorkbench: "生图工作台",
     },
     version: {
         viewUpdates: "查看版本更新",

@@ -315,6 +315,7 @@ export default {
         description: "Generate, connect, and reshape <content>images, text, and graphics</content> in <canvas>Infinite Canvas</canvas>, turning one-off generations into a continuous creative process.",
         start: "Get started",
         openCanvas: "Open canvas",
+        openImageWorkbench: "Image Workbench",
     },
     version: {
         viewUpdates: "View release updates",
