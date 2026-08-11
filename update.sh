@@ -35,10 +35,11 @@ git checkout main
 echo -e "${GREEN}✓ 已切换到 main 分支${NC}"
 echo ""
 
-# 拉取最新代码
+# 拉取最新代码（从 upstream = 原作者仓库）
 echo -e "${YELLOW}[3/5]${NC} 拉取原作者最新代码..."
-git pull origin main
-echo -e "${GREEN}✓ 已拉取最新代码${NC}"
+git pull upstream main
+git push origin main
+echo -e "${GREEN}✓ 已拉取最新代码并同步到私有仓库${NC}"
 echo ""
 
 # 切换回 custom 分支
@@ -51,13 +52,15 @@ echo ""
 echo -e "${YELLOW}[5/5]${NC} 合并 main 分支的更新..."
 if git merge main --no-edit; then
     echo -e "${GREEN}✓ 合并成功，无冲突${NC}"
+    git push origin custom
+    echo -e "${GREEN}✓ 已推送到私有仓库${NC}"
     echo ""
     echo "=========================================="
     echo -e "${GREEN}更新完成！${NC}"
     echo "=========================================="
     echo ""
-    echo "现在可以重新部署："
-    echo "  ./deploy.sh"
+    echo "接下来在服务器上执行："
+    echo "  cd ~/infinite-canvas && git pull origin custom && ./deploy.sh"
     echo ""
 else
     echo -e "${RED}✗ 合并出现冲突${NC}"
@@ -66,7 +69,8 @@ else
     echo "  1. 编辑冲突文件，解决 <<<<<<< 标记的冲突"
     echo "  2. git add <解决的文件>"
     echo "  3. git commit"
-    echo "  4. ./deploy.sh"
+    echo "  4. git push origin custom"
+    echo "  5. 在服务器上 git pull origin custom && ./deploy.sh"
     echo ""
     exit 1
 fi
