@@ -491,7 +491,8 @@ export default {
             errors: { testFailed: "WebDAV connection test failed", downloadFailed: "Failed to read the WebDAV sync file", downloadTimeout: "Timed out while reading the WebDAV sync file", emptyUpload: "The upload file is empty; upload canceled", uploadFailed: "Failed to upload the WebDAV sync file", directoryFailed: "Failed to create the remote WebDAV directory", requestTimeout: "The WebDAV request timed out. Check the network or remote service.", connectionFailed: "Could not connect to WebDAV. Check the address, HTTPS certificate, CORS, and network.", urlRequired: "Enter a WebDAV URL first", authenticationFailed: "WebDAV authentication failed. Check the username, password, or app password.", pathMissing: "The WebDAV path does not exist. Check the address and remote directory.", responseFailed: "{{fallback}}: {{status}}{{detail}}", syncFailed: "Sync failed", invalidManifest: "The {{domain}} sync manifest does not belong to this app" },
         },
         protocols: {
-            ark: "Volcengine Ark",
+            grok: "Grok",
+            seedance: "Seedance",
         },
     },
     agent: {

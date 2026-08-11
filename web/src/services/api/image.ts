@@ -805,7 +805,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         }
     }
 
-    if (requestConfig.apiFormat === "ark") {
+    if (requestConfig.apiFormat === "seedance") {
         if (mask) throw new Error(apiText("maskModelUnsupported"));
         const quality = normalizeQuality(config.quality);
         const requestSize = resolveRequestSize(quality, config.size);
