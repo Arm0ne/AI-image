@@ -6,6 +6,7 @@ import { Trans, useTranslation } from "react-i18next";
 
 import { navigationTools } from "@/constant/navigation-tools";
 import { TypewriterText } from "@/components/typewriter-text";
+import { ParticleCanvas } from "@/components/particle-canvas";
 
 function Highlighter({ action, color, children }: { action: "highlight" | "underline"; color: string; children?: ReactNode }) {
     return (
@@ -26,11 +27,10 @@ export default function IndexPage() {
     const [primaryTool] = navigationTools;
 
     return (
-        <main className="relative h-full overflow-y-auto bg-background bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] text-stone-950 dark:bg-[radial-gradient(rgba(245,245,244,.18)_1px,transparent_1px)] dark:text-stone-100">
+        <main className="relative h-full overflow-y-auto text-stone-950 dark:text-stone-100">
+            <ParticleCanvas />
+            <div className="pointer-events-none absolute inset-0 -z-10 bg-[#050507]" />
             <section className="relative mx-auto min-h-[calc(100vh-4rem)] max-w-7xl overflow-hidden px-6">
-                <div className="pointer-events-none absolute left-[15%] top-24 size-20 rounded-full border border-dashed border-stone-200 dark:border-stone-800" />
-                <div className="pointer-events-none absolute right-[23%] top-[48%] size-20 rounded-full border border-dashed border-stone-200 dark:border-stone-800" />
-
                 <div className="relative flex min-h-[620px] flex-col items-center justify-center pt-16 text-center">
                     <div className="min-h-[16rem] sm:min-h-[20rem] lg:min-h-[24rem]">
                         <TypewriterText
