@@ -6,9 +6,11 @@ import { useTranslation } from "react-i18next";
 
 import { useCopyText } from "@/hooks/use-copy-text";
 import { formatBytes, readFileAsDataUrl } from "@/lib/image-utils";
+import { prepareImageForDownload } from "@/lib/image-format-converter";
 import { uploadImage } from "@/services/image-storage";
 import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset, type AssetKind, type ImageAsset } from "@/stores/use-asset-store";
+import { useConfigStore } from "@/stores/use-config-store";
 import { exportAssets, readAssetPackage } from "./asset-transfer";
 
 type AssetFormValues = {
@@ -143,9 +145,15 @@ export default function AssetsPage() {
         copyText(asset.data.content, t("assets.textCopied"));
     };
 
-    const downloadImage = (asset: Asset) => {
+    const downloadImage = async (asset: Asset) => {
         if (asset.kind !== "image" && asset.kind !== "video") return;
-        saveAs(asset.kind === "video" ? asset.data.url : asset.data.dataUrl, `${asset.title || "asset"}.${asset.data.mimeType.split("/")[1] || "png"}`);
+        if (asset.kind === "image") {
+            const format = useConfigStore.getState().config.imageDownloadFormat;
+            const { dataUrl, extension } = await prepareImageForDownload(asset.data.dataUrl, format);
+            saveAs(dataUrl, `${asset.title || "asset"}.${extension}`);
+        } else {
+            saveAs(asset.data.url, `${asset.title || "asset"}.${asset.data.mimeType.split("/")[1] || "mp4"}`);
+        }
     };
 
     const exportAllAssets = async () => {

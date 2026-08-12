@@ -1,0 +1,68 @@
+From e9a687d5ab61f5fe48265bf423cee892ac17d593 Mon Sep 17 00:00:00 2001
+From: Arm0ne <Arm0ne@users.noreply.github.com>
+Date: Wed, 12 Aug 2026 01:05:34 +0800
+Subject: [PATCH 2/3] =?UTF-8?q?feat:=20=E4=BC=98=E5=8C=96=E9=A6=96?=
+ =?UTF-8?q?=E9=A1=B5=E6=8C=89=E9=92=AE=E5=8A=9F=E8=83=BD?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- 第一个按钮改为「打开画布」，跳转到画布页面
+- 第二个按钮改为「生图工作台」，跳转到生图页面
+- 添加对应的中英文翻译
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ web/src/i18n/locales/en-US.ts | 1 +
+ web/src/i18n/locales/zh-CN.ts | 1 +
+ web/src/pages/home/index.tsx  | 8 ++++----
+ 3 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/web/src/i18n/locales/en-US.ts b/web/src/i18n/locales/en-US.ts
+index 88b9b40..f7a8f71 100644
+--- a/web/src/i18n/locales/en-US.ts
++++ b/web/src/i18n/locales/en-US.ts
+@@ -315,6 +315,7 @@ export default {
+         description: "Generate, connect, and reshape <content>images, text, and graphics</content> in <canvas>Infinite Canvas</canvas>, turning one-off generations into a continuous creative process.",
+         start: "Get started",
+         openCanvas: "Open canvas",
++        openImageWorkbench: "Image Workbench",
+     },
+     version: {
+         viewUpdates: "View release updates",
+diff --git a/web/src/i18n/locales/zh-CN.ts b/web/src/i18n/locales/zh-CN.ts
+index 4c9ebc7..96584f6 100644
+--- a/web/src/i18n/locales/zh-CN.ts
++++ b/web/src/i18n/locales/zh-CN.ts
+@@ -315,6 +315,7 @@ export default {
+         description: "在 <canvas>无限画布</canvas> 中生成、连接和重组 <content>图片、文字与图形</content>，让创作从单次生成变成连续推演。",
+         start: "开始使用",
+         openCanvas: "打开画布",
++        openImageWorkbench: "生图工作台",
+     },
+     version: {
+         viewUpdates: "查看版本更新",
+diff --git a/web/src/pages/home/index.tsx b/web/src/pages/home/index.tsx
+index dd46510..0e462e6 100644
+--- a/web/src/pages/home/index.tsx
++++ b/web/src/pages/home/index.tsx
+@@ -66,12 +66,12 @@ export default function IndexPage() {
+                         />
+                     </div>
+                     <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+-                        <Button type="primary" size="large" onClick={() => navigate(`/${primaryTool.slug}`)} icon={<ArrowRight className="size-4" />} iconPlacement="end">
+-                            {t("home.start")}
+-                        </Button>
+-                        <Button size="large" onClick={() => navigate("/canvas")}>
++                        <Button type="primary" size="large" onClick={() => navigate("/canvas")} icon={<ArrowRight className="size-4" />} iconPlacement="end">
+                             {t("home.openCanvas")}
+                         </Button>
++                        <Button size="large" onClick={() => navigate("/image")}>
++                            {t("home.openImageWorkbench")}
++                        </Button>
+                     </div>
+                 </div>
+             </section>
+-- 
+2.54.0.windows.1
+

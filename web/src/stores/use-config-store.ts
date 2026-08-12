@@ -51,6 +51,7 @@ export type AiConfig = {
     background: string;
     count: string;
     canvasImageCount: string;
+    imageDownloadFormat: "original" | "webp";
 };
 
 export type WebdavSyncConfig = {
@@ -110,6 +111,7 @@ export const defaultConfig: AiConfig = {
     background: "",
     count: "1",
     canvasImageCount: "1",
+    imageDownloadFormat: "original",
 };
 
 export const defaultWebdavSyncConfig: WebdavSyncConfig = {
@@ -248,6 +250,7 @@ export const useConfigStore = create<ConfigStore>()(
                         videoGenerateAudio: config.videoGenerateAudio || "true",
                         videoWatermark: config.videoWatermark || "false",
                         canvasImageCount: config.canvasImageCount || "3",
+                        imageDownloadFormat: config.imageDownloadFormat || "original",
                     },
                 };
             },

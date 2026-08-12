@@ -14,6 +14,7 @@ import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } f
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
+import { prepareImageForDownload } from "@/lib/image-format-converter";
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -233,8 +234,10 @@ export default function ImagePage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [autoRunToken]);
 
-    const downloadImage = (image: GeneratedImage, index: number) => {
-        saveAs(image.dataUrl, `image-${index + 1}.png`);
+    const downloadImage = async (image: GeneratedImage, index: number) => {
+        const format = useConfigStore.getState().config.imageDownloadFormat;
+        const { dataUrl, extension } = await prepareImageForDownload(image.dataUrl, format);
+        saveAs(dataUrl, `image-${index + 1}.${extension}`);
     };
 
     const addResultToReferences = async (image: GeneratedImage, index: number) => {

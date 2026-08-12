@@ -1,0 +1,40 @@
+From 787e52b4d3ebe64354928f24b552bc46b44c2011 Mon Sep 17 00:00:00 2001
+From: Arm0ne <Arm0ne@users.noreply.github.com>
+Date: Wed, 12 Aug 2026 01:11:28 +0800
+Subject: [PATCH 3/3] =?UTF-8?q?feat:=20=E7=BB=9F=E4=B8=80=E6=89=80?=
+ =?UTF-8?q?=E6=9C=89=E5=8D=8F=E8=AE=AE=E7=9A=84=E9=BB=98=E8=AE=A4=E6=8E=A5?=
+ =?UTF-8?q?=E5=8F=A3=E5=9C=B0=E5=9D=80?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- 将 OpenAI、Gemini、Grok、Seedance 四个协议的默认接口地址统一改为 https://api.panlai.me
+- 用户新增渠道时，无论选择哪个协议，默认都使用统一的接口地址
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ web/src/stores/use-config-store.ts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/web/src/stores/use-config-store.ts b/web/src/stores/use-config-store.ts
+index 38267de..41933a6 100644
+--- a/web/src/stores/use-config-store.ts
++++ b/web/src/stores/use-config-store.ts
+@@ -64,10 +64,10 @@ export type ConfigTabKey = "channels" | "preferences" | "webdav" | "local-storag
+ 
+ export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
+ const CHANNEL_MODEL_SEPARATOR = "::";
+-const OPENAI_BASE_URL = "https://api.openai.com";
+-const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
+-const GROK_BASE_URL = "https://api.x.ai/v1";
+-const SEEDANCE_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
++const OPENAI_BASE_URL = "https://api.panlai.me";
++const GEMINI_BASE_URL = "https://api.panlai.me";
++const GROK_BASE_URL = "https://api.panlai.me";
++const SEEDANCE_BASE_URL = "https://api.panlai.me";
+ 
+ export const defaultConfig: AiConfig = {
+     channelMode: "local",
+-- 
+2.54.0.windows.1
+

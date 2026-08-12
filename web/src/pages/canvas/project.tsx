@@ -13,6 +13,7 @@ import { uploadImage } from "@/services/image-storage";
 import { uploadMediaFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
+import { prepareImageForDownload } from "@/lib/image-format-converter";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -1535,15 +1536,24 @@ function InfiniteCanvasPage() {
         setNodes((prev) => prev.map((node) => (node.id === nodeId ? applyNodeConfigPatch(node, patch) : node)));
     }, []);
 
-    const downloadNodeImage = useCallback((node: CanvasNodeData) => {
+    const downloadNodeImage = useCallback(async (node: CanvasNodeData) => {
         if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Audio) || !node.metadata?.content) return;
-        saveAs(node.metadata.content, `canvas-${node.type}-${node.id}.${node.type === CanvasNodeType.Video ? "mp4" : node.type === CanvasNodeType.Audio ? audioExtension(node.metadata.mimeType) : imageExtension(node.metadata.content)}`);
+
+        if (node.type === CanvasNodeType.Image) {
+            const format = useConfigStore.getState().config.imageDownloadFormat;
+            const { dataUrl, extension } = await prepareImageForDownload(node.metadata.content, format);
+            saveAs(dataUrl, `canvas-${node.type}-${node.id}.${extension}`);
+        } else {
+            saveAs(node.metadata.content, `canvas-${node.type}-${node.id}.${node.type === CanvasNodeType.Video ? "mp4" : node.type === CanvasNodeType.Audio ? audioExtension(node.metadata.mimeType) : "png"}`);
+        }
     }, []);
 
-    const downloadBatchImage = useCallback((node: CanvasNodeData, imageId: string) => {
+    const downloadBatchImage = useCallback(async (node: CanvasNodeData, imageId: string) => {
         const image = node.metadata?.images?.find((item) => item.id === imageId);
         if (!image?.content) return;
-        saveAs(image.content, `canvas-image-${node.id}-${image.id}.${imageExtension(image.content)}`);
+        const format = useConfigStore.getState().config.imageDownloadFormat;
+        const { dataUrl, extension } = await prepareImageForDownload(image.content, format);
+        saveAs(dataUrl, `canvas-image-${node.id}-${image.id}.${extension}`);
     }, []);
 
     const saveNodeAsset = useCallback(

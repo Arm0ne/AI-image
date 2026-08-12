@@ -235,6 +235,16 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                             onBlur={(event) => updateConfig("canvasImageCount", normalizeImageCount(event.target.value))}
                                         />
                                     </Form.Item>
+                                    <Form.Item label={t("config.preferences.imageDownloadFormat")} extra={t("config.preferences.imageDownloadFormatDescription")} className="mb-4">
+                                        <Select
+                                            value={config.imageDownloadFormat}
+                                            options={[
+                                                { label: t("config.preferences.originalFormat"), value: "original" },
+                                                { label: "WebP", value: "webp" },
+                                            ]}
+                                            onChange={(value) => updateConfig("imageDownloadFormat", value)}
+                                        />
+                                    </Form.Item>
                                     <Form.Item label={t("config.preferences.audioVoice")} className="mb-4">
                                         <Select value={config.audioVoice} options={audioVoiceOptions} onChange={(value) => updateConfig("audioVoice", value)} />
                                     </Form.Item>
