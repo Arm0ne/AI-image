@@ -211,7 +211,7 @@ function resolveGeminiImageConfig(config: AiConfig) {
     const ratio = dimensions ? `${dimensions.width}:${dimensions.height}` : value;
     const aspectRatio = value && value.toLowerCase() !== "auto" ? closestGeminiAspectRatio(ratio) : undefined;
     const imageSize = supportsGeminiImageSize(config.model) ? resolveGeminiImageSize(config.quality, dimensions) : undefined;
-    const image = { ...(aspectRatio ? { aspectRatio } : {}), ...(imageSize ? { imageSize } : {}) };
+    const imageParams = { ...(aspectRatio ? { aspectRatio } : {}), ...(imageSize ? { imageSize } : {}) };
 
     // 调试日志
     console.log('=== resolveGeminiImageConfig ===');
@@ -222,10 +222,10 @@ function resolveGeminiImageConfig(config: AiConfig) {
     console.log('Resolved dimensions:', dimensions);
     console.log('Resolved imageSize:', imageSize);
     console.log('Resolved aspectRatio:', aspectRatio);
-    console.log('Final image config:', JSON.stringify(image, null, 2));
+    console.log('Final imageConfig:', JSON.stringify(imageParams, null, 2));
 
-    // 直接返回 image 对象，而不是包装在 responseFormat 中
-    return image;
+    // 返回包装在 imageConfig 中的参数
+    return Object.keys(imageParams).length ? { imageConfig: imageParams } : {};
 }
 
 function closestGeminiAspectRatio(value: string) {
@@ -717,14 +717,26 @@ async function requestGeminiImagesOnce(config: AiConfig, prompt: string, referen
     for (const image of references) {
         parts.push(toGeminiImagePart(await imageToDataUrl(image)));
     }
+    const imageConfig = resolveGeminiImageConfig(config);
+    const requestBody = {
+        ...toGeminiBody(config, [{ role: "user", content: prompt }], { generationConfig: { responseModalities: ["TEXT", "IMAGE"], ...imageConfig } }),
+        contents: [{ role: "user", parts }],
+    };
+
+    // 记录完整的请求体
+    console.log('=== Gemini API Request Body ===');
+    console.log(JSON.stringify(requestBody, null, 2));
+
     const response = await axios.post<GeminiPayload>(
         geminiApiUrl(config, "generateContent"),
-        {
-            ...toGeminiBody(config, [{ role: "user", content: prompt }], { generationConfig: { responseModalities: ["TEXT", "IMAGE"], ...resolveGeminiImageConfig(config) } }),
-            contents: [{ role: "user", parts }],
-        },
+        requestBody,
         { headers: geminiHeaders(config), signal: options?.signal },
     );
+
+    // 记录响应
+    console.log('=== Gemini API Response ===');
+    console.log('Response data:', response.data);
+
     return parseGeminiImagePayload(response.data);
 }
 
@@ -739,7 +751,16 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
                 return part.fileData?.fileUri || null;
             })
             .filter((value): value is string => Boolean(value))
-            .map((dataUrl) => ({ id: nanoid(), dataUrl })) || [];
+            .map((dataUrl) => {
+                // 记录图片尺寸
+                const img = new Image();
+                img.onload = () => {
+                    console.log('=== Generated Image Size ===');
+                    console.log(`Width: ${img.width}, Height: ${img.height}`);
+                };
+                img.src = dataUrl;
+                return { id: nanoid(), dataUrl };
+            }) || [];
     if (!images.length) throw new Error(apiText("geminiNoImage"));
     return images;
 }
