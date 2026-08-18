@@ -11,6 +11,14 @@ import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
+/** 开发环境自动使用代理，避免 CORS 问题 */
+function normalizeBaseUrlForDev(baseUrl: string): string {
+    if (import.meta.env.DEV && baseUrl.includes("api.panlai.me")) {
+        return baseUrl.replace(/https?:\/\/api\.panlai\.me/, "/api");
+    }
+    return baseUrl;
+}
+
 export type AiTextMessage = {
     role: "system" | "user" | "assistant";
     content: string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
@@ -204,7 +212,20 @@ function resolveGeminiImageConfig(config: AiConfig) {
     const aspectRatio = value && value.toLowerCase() !== "auto" ? closestGeminiAspectRatio(ratio) : undefined;
     const imageSize = supportsGeminiImageSize(config.model) ? resolveGeminiImageSize(config.quality, dimensions) : undefined;
     const image = { ...(aspectRatio ? { aspectRatio } : {}), ...(imageSize ? { imageSize } : {}) };
-    return Object.keys(image).length ? { responseFormat: { image } } : {};
+
+    // 调试日志
+    console.log('=== resolveGeminiImageConfig ===');
+    console.log('Input size:', config.size);
+    console.log('Input quality:', config.quality);
+    console.log('Model:', config.model);
+    console.log('Supports imageSize:', supportsGeminiImageSize(config.model));
+    console.log('Resolved dimensions:', dimensions);
+    console.log('Resolved imageSize:', imageSize);
+    console.log('Resolved aspectRatio:', aspectRatio);
+    console.log('Final image config:', JSON.stringify(image, null, 2));
+
+    // 直接返回 image 对象，而不是包装在 responseFormat 中
+    return image;
 }
 
 function closestGeminiAspectRatio(value: string) {
@@ -219,9 +240,18 @@ function closestGeminiAspectRatio(value: string) {
 
 function resolveGeminiImageSize(quality: string, dimensions: { width: number; height: number } | null) {
     const normalizedQuality = normalizeQuality(quality);
-    if (normalizedQuality) return GEMINI_IMAGE_SIZE_BY_QUALITY[normalizedQuality];
-    if (!dimensions) return undefined;
+    console.log('resolveGeminiImageSize - quality:', quality, 'normalized:', normalizedQuality);
+    if (normalizedQuality) {
+        const imageSize = GEMINI_IMAGE_SIZE_BY_QUALITY[normalizedQuality];
+        console.log('Using quality-based imageSize:', imageSize);
+        return imageSize;
+    }
+    if (!dimensions) {
+        console.log('No dimensions and no normalized quality, returning undefined');
+        return undefined;
+    }
     const edge = Math.max(dimensions.width, dimensions.height);
+    console.log('Using dimension-based imageSize, edge:', edge);
     if (edge <= 768) return "512";
     if (edge <= 1536) return "1K";
     if (edge <= 3072) return "2K";
@@ -229,8 +259,9 @@ function resolveGeminiImageSize(quality: string, dimensions: { width: number; he
 }
 
 function supportsGeminiImageSize(model: string) {
-    const value = model.toLowerCase();
-    return value.includes("gemini-3") || value.includes("3.1") || value.includes("3-pro");
+    // Gemini 2.0+、Gemini 3.0+ 和 Imagen 模型支持 imageSize 参数
+    const modelLower = model.toLowerCase();
+    return modelLower.includes("gemini-2") || modelLower.includes("gemini-3") || modelLower.includes("imagen");
 }
 
 function resolveImageDataUrl(item: Record<string, unknown>) {
@@ -333,7 +364,7 @@ function withSystemPrompt(config: AiConfig, prompt: string) {
 }
 
 function aiApiUrl(config: AiConfig, path: string) {
-    return buildApiUrl(config.baseUrl, path);
+    return buildApiUrl(normalizeBaseUrlForDev(config.baseUrl), path);
 }
 
 function aiHeaders(config: AiConfig, contentType?: string) {
@@ -344,7 +375,7 @@ function aiHeaders(config: AiConfig, contentType?: string) {
 }
 
 function geminiBaseUrl(config: Pick<AiConfig, "baseUrl">) {
-    const normalizedBaseUrl = config.baseUrl.trim().replace(/\/+$/, "");
+    const normalizedBaseUrl = normalizeBaseUrlForDev(config.baseUrl).trim().replace(/\/+$/, "");
     const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
     return lowerBaseUrl.endsWith("/v1") || lowerBaseUrl.endsWith("/v1beta") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1beta`;
 }
