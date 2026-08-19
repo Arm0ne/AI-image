@@ -84,17 +84,29 @@ export const defaultConfig: AiConfig = {
             apiFormat: "openai",
             models: [
                 { name: "gpt-image-2", capability: "image" },
-                { name: "grok-imagine-video", capability: "video" },
-                { name: "gpt-5.5", capability: "text" },
-                { name: "gpt-4o-mini-tts", capability: "audio" },
+            ],
+        },
+        {
+            id: "nano-banana",
+            name: "Nano Banana",
+            baseUrl: "https://api.panlai.me",
+            apiKey: "",
+            apiFormat: "gemini",
+            models: [
+                { name: "gemini-2.5-flash-image", capability: "image" },
+                { name: "gemini-2.5-flash-image-preview", capability: "image" },
+                { name: "gemini-3-pro-image", capability: "image" },
+                { name: "gemini-3-pro-image-preview", capability: "image" },
+                { name: "gemini-3.1-flash-image", capability: "image" },
+                { name: "gemini-3.1-flash-image-preview", capability: "image" },
             ],
         },
     ],
     model: "default::gpt-image-2",
     imageModel: "default::gpt-image-2",
-    videoModel: "default::grok-imagine-video",
-    textModel: "default::gpt-5.5",
-    audioModel: "default::gpt-4o-mini-tts",
+    videoModel: "",
+    textModel: "",
+    audioModel: "",
     audioVoice: "alloy",
     audioFormat: "mp3",
     audioSpeed: "1",
@@ -397,6 +409,12 @@ function uniqueModelOptions(models: string[]) {
 export function buildApiUrl(baseUrl: string, path: string) {
     const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
     const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
+
+    // 开发环境下，将 api.panlai.me 的请求通过 Vite 代理转发，避免 CORS 问题
+    if (import.meta.env.DEV && lowerBaseUrl === "https://api.panlai.me") {
+        return `/api${path}`;
+    }
+
     const apiBaseUrl = lowerBaseUrl.endsWith("/v1") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1`;
     return `${apiBaseUrl}${path}`;
 }

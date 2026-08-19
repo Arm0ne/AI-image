@@ -390,7 +390,7 @@ export default {
             modelCount: "{{count}} models",
             missingUrl: "API endpoint not set",
             keepOne: "Keep at least one provider",
-            defaultName: "Default provider",
+            defaultName: "Image2 Channel",
             newName: "New provider",
             indexedName: "Provider {{index}}",
         },
