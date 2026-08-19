@@ -241,6 +241,13 @@ export const useConfigStore = create<ConfigStore>()(
                 const persistedWebdav = (persistedState.webdav || {}) as Partial<WebdavSyncConfig>;
                 const config = { ...defaultConfig, ...persistedConfig };
                 if (!Array.isArray(persistedConfig.channels)) config.channels = [];
+                // 把 defaultConfig 中有但用户本地没有的渠道补进去（按 id 判断）
+                const persistedIds = new Set(config.channels.map((c: ModelChannel) => c.id));
+                for (const defaultChannel of defaultConfig.channels) {
+                    if (!persistedIds.has(defaultChannel.id)) {
+                        config.channels.push(defaultChannel);
+                    }
+                }
                 const channels = normalizeChannels(config);
                 const models = modelOptionsFromChannels(channels);
                 return {
