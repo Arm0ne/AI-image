@@ -78,7 +78,7 @@ export const defaultConfig: AiConfig = {
     channels: [
         {
             id: "default",
-            name: i18n.t("config.channels.defaultName"),
+            name: "Image2渠道",
             baseUrl: "https://api.panlai.me",
             apiKey: "",
             apiFormat: "openai",
