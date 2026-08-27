@@ -1,4 +1,4 @@
-import { Bot, Menu } from "lucide-react";
+import { Bot, Menu, Cloud } from "lucide-react";
 import { Button, Tooltip } from "antd";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,7 @@ import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-
 import { AppConfigModal } from "@/components/layout/app-config-modal";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
+import { Sub2ApiLoginModal } from "@/components/layout/sub2api-login-modal";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { useAgentStore } from "@/stores/use-agent-store";
@@ -15,6 +16,7 @@ export function AppTopNav() {
     const { t } = useTranslation();
     const { pathname } = useLocation();
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
+    const [sub2apiLoginOpen, setSub2apiLoginOpen] = useState(false);
     const autoConnectRef = useRef(false);
     const agentToken = useAgentStore((state) => state.token);
     const agentEnabled = useAgentStore((state) => state.enabled);
@@ -83,6 +85,9 @@ export function AppTopNav() {
                         </div>
 
                         <div className="my-auto flex h-9 min-w-0 items-center justify-end gap-2 justify-self-end whitespace-nowrap">
+                            <Button type="primary" icon={<Cloud className="size-4" />} onClick={() => setSub2apiLoginOpen(true)}>
+                                登录同步
+                            </Button>
                             <Tooltip title={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")}>
                                 <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" icon={<Bot className="size-4" />} onClick={togglePanel} aria-label={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")} />
                             </Tooltip>
@@ -94,6 +99,7 @@ export function AppTopNav() {
 
             <MobileNavDrawer open={mobileNavOpen} activeToolSlug={activeToolSlug} onClose={() => setMobileNavOpen(false)} />
             <AppConfigModal />
+            <Sub2ApiLoginModal open={sub2apiLoginOpen} onClose={() => setSub2apiLoginOpen(false)} />
         </>
     );
 }

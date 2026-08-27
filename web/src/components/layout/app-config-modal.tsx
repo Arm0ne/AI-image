@@ -101,10 +101,6 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     };
 
     const deleteChannel = (id: string) => {
-        if (config.channels.length <= 1) {
-            message.warning(t("config.channels.keepOne"));
-            return;
-        }
         updateChannels(config.channels.filter((channel) => channel.id !== id));
     };
 
@@ -188,11 +184,8 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                                     <div className="text-xs text-stone-500">{t("config.channels.description")}</div>
                                     <div className="flex gap-2">
-                                        <Button icon={<Cloud className="size-4" />} onClick={() => setSub2apiLoginOpen(true)}>
+                                        <Button type="primary" icon={<Cloud className="size-4" />} onClick={() => setSub2apiLoginOpen(true)}>
                                             从 Sub2API 同步
-                                        </Button>
-                                        <Button type="primary" icon={<Plus className="size-4" />} onClick={addChannel}>
-                                            {t("config.channels.add")}
                                         </Button>
                                     </div>
                                 </div>
