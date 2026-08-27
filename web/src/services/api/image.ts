@@ -14,7 +14,8 @@ const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiE
 /** 开发环境自动使用代理，避免 CORS 问题 */
 function normalizeBaseUrlForDev(baseUrl: string): string {
     if (import.meta.env.DEV && baseUrl.includes("api.panlai.me")) {
-        return baseUrl.replace(/https?:\/\/api\.panlai\.me/, "/api");
+        // 开发环境下，直接去掉域名，保留空字符串让路径直接从根开始
+        return "";
     }
     return baseUrl;
 }

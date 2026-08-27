@@ -19,6 +19,7 @@ import { requestEdit, requestGeneration } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
+import { useGenerationStore } from "@/stores/use-generation-store";
 import type { ReferenceImage } from "@/types/image";
 import i18n from "@/i18n";
 
@@ -100,6 +101,13 @@ export default function ImagePage() {
     const processedCommandRef = useRef(0);
     const agentTaskIdRef = useRef<string | undefined>(undefined);
 
+    // Generation store for persistent task tracking
+    const addTask = useGenerationStore((state) => state.addTask);
+    const updateTask = useGenerationStore((state) => state.updateTask);
+    const updateTaskImage = useGenerationStore((state) => state.updateTaskImage);
+    const getActiveTask = useGenerationStore((state) => state.getActiveTask);
+    const currentTaskIdRef = useRef<string | undefined>(undefined);
+
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
     const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
@@ -112,7 +120,65 @@ export default function ImagePage() {
 
     useEffect(() => {
         void refreshLogs();
+
+        // 检查是否有活动任务，如果有则恢复 UI 状态
+        const activeTask = getActiveTask();
+        if (activeTask) {
+            currentTaskIdRef.current = activeTask.id;
+            setRunning(true);
+            setPrompt(activeTask.prompt);
+            setStartedAt(activeTask.createdAt);
+
+            // 从任务恢复结果状态
+            const taskResults: GenerationResult[] = activeTask.images.map((img) => ({
+                id: img.id,
+                status: img.status === "pending" ? "pending" : img.status === "success" ? "success" : "failed",
+                image: img.status === "success" && img.dataUrl ? {
+                    id: img.id,
+                    dataUrl: img.dataUrl,
+                    storageKey: img.storageKey,
+                    durationMs: 0,
+                    width: 0,
+                    height: 0,
+                    bytes: 0,
+                } : undefined,
+                error: img.error,
+            }));
+            setResults(taskResults);
+        }
     }, []);
+
+    // 监听当前任务的变化，实时同步到 results 状态
+    const tasks = useGenerationStore((state) => state.tasks);
+    useEffect(() => {
+        if (!currentTaskIdRef.current) return;
+
+        const currentTask = tasks.find((task) => task.id === currentTaskIdRef.current);
+        if (!currentTask) return;
+
+        // 同步任务的图片状态到 results
+        const taskResults: GenerationResult[] = currentTask.images.map((img) => ({
+            id: img.id,
+            status: img.status === "pending" ? "pending" : img.status === "success" ? "success" : "failed",
+            image: img.status === "success" && img.dataUrl ? {
+                id: img.id,
+                dataUrl: img.dataUrl,
+                storageKey: img.storageKey,
+                durationMs: 0,
+                width: 0,
+                height: 0,
+                bytes: 0,
+            } : undefined,
+            error: img.error,
+        }));
+        setResults(taskResults);
+
+        // 如果任务已完成或失败，更新 running 状态和清除任务引用
+        if (currentTask.status === "success" || currentTask.status === "failed") {
+            setRunning(false);
+            currentTaskIdRef.current = undefined;
+        }
+    }, [tasks]);
 
     const addReferences = async (files?: FileList | null) => {
         const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
@@ -172,44 +238,121 @@ export default function ImagePage() {
         setRunning(true);
         if (agentTaskId) updateAgentTask(agentTaskId, { status: "running", error: undefined });
         setPreviewLog(null);
-        setResults(Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending" })));
+
+        // 创建全局任务以便跨页面追踪
+        const taskId = nanoid();
+        currentTaskIdRef.current = taskId;
+        const initialResults = Array.from({ length: generationCount }, () => ({ id: nanoid(), dataUrl: "", storageKey: undefined, status: "pending" as const }));
+        setResults(initialResults.map(r => ({ id: r.id, status: "pending" })));
+
+        const createdTaskId = addTask({
+            prompt: text,
+            model,
+            count: generationCount,
+            status: "running",
+            images: initialResults,
+        });
+
+        // 使用 addTask 返回的 ID
+        currentTaskIdRef.current = createdTaskId;
+
         const batchStartedAt = performance.now();
         setStartedAt(batchStartedAt);
 
         const tasks = Array.from({ length: generationCount }, (_, index) => runGenerationSlot(index, snapshot));
 
-        const result = await Promise.allSettled(tasks);
-        const successImages = result.filter((item): item is PromiseFulfilledResult<GeneratedImage> => item.status === "fulfilled").map((item) => item.value);
-        const successCount = successImages.length;
-        const failCount = generationCount - successCount;
-        const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
-        const error = failed?.reason instanceof Error ? failed.reason.message : failCount ? t("workbench.generationFailed") : undefined;
-        if (agentTaskId) updateAgentTask(agentTaskId, { status: successCount ? "succeeded" : "failed", successCount, failCount, error: successCount ? undefined : error });
+        // 使用后台 Promise 确保即使组件卸载也能继续执行
+        Promise.allSettled(tasks).then(async (result) => {
+            const successImages = result.filter((item): item is PromiseFulfilledResult<GeneratedImage> => item.status === "fulfilled").map((item) => item.value);
+            const successCount = successImages.length;
+            const failCount = generationCount - successCount;
+            const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
+            const error = failed?.reason instanceof Error ? failed.reason.message : failCount ? t("workbench.generationFailed") : undefined;
+            if (agentTaskId) updateAgentTask(agentTaskId, { status: successCount ? "succeeded" : "failed", successCount, failCount, error: successCount ? undefined : error });
 
-        try {
-            const logImages = await Promise.all(
-                successImages.map(async (image) => {
-                    const stored = await uploadImage(image.dataUrl);
-                    return { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
-                }),
-            );
-            saveLog(
-                buildLog({
-                    prompt: text,
-                    model,
-                    config: { ...snapshot.config, count: String(generationCount) },
-                    references: snapshot.references,
-                    durationMs: performance.now() - batchStartedAt,
-                    successCount,
-                    failCount,
-                    status: successCount ? "success" : "failed",
-                    images: logImages,
-                }),
-            );
-            successCount ? message.success(t("imageWorkbench.generated")) : message.error(failed?.reason instanceof Error ? failed.reason.message : t("workbench.generationFailed"));
-        } finally {
+            try {
+                // 更新每张图片的状态到 store（包括失败的）
+                result.forEach((item, index) => {
+                    if (item.status === "fulfilled") {
+                        updateTaskImage(createdTaskId, initialResults[index].id, {
+                            dataUrl: item.value.dataUrl,
+                            status: "success",
+                        });
+                    } else {
+                        updateTaskImage(createdTaskId, initialResults[index].id, {
+                            status: "failed",
+                            error: item.reason instanceof Error ? item.reason.message : String(item.reason),
+                        });
+                    }
+                });
+
+                const logImages = await Promise.all(
+                    successImages.map(async (image) => {
+                        const stored = await uploadImage(image.dataUrl);
+                        return { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
+                    }),
+                );
+
+                // 上传完成后，更新 store 中的图片 URL 和 storageKey
+                logImages.forEach((image) => {
+                    const resultIndex = successImages.findIndex(img => img.id === image.id);
+                    if (resultIndex !== -1) {
+                        const originalIndex = result.findIndex((item, idx) => item.status === "fulfilled" && result.slice(0, idx + 1).filter(r => r.status === "fulfilled").length === resultIndex + 1);
+                        if (originalIndex !== -1) {
+                            updateTaskImage(createdTaskId, initialResults[originalIndex].id, {
+                                dataUrl: image.dataUrl,
+                                storageKey: image.storageKey,
+                                status: "success",
+                            });
+                        }
+                    }
+                });
+
+                // 保存到历史记录
+                saveLog(
+                    buildLog({
+                        prompt: text,
+                        model,
+                        config: { ...snapshot.config, count: String(generationCount) },
+                        references: snapshot.references,
+                        durationMs: performance.now() - batchStartedAt,
+                        successCount,
+                        failCount,
+                        status: successCount ? "success" : "failed",
+                        images: logImages,
+                    }),
+                );
+
+                // 自动保存到资产库
+                logImages.forEach((image) => {
+                    addAsset({
+                        id: nanoid(),
+                        name: `${text.slice(0, 30)}${text.length > 30 ? "..." : ""}`,
+                        url: image.dataUrl,
+                        storageKey: image.storageKey,
+                        type: "image",
+                        width: image.width,
+                        height: image.height,
+                        bytes: image.bytes,
+                        mimeType: image.mimeType,
+                        createdAt: Date.now(),
+                    });
+                });
+
+                // 不需要手动更新任务状态，updateTaskImage 已经自动处理了
+
+                successCount ? message.success(t("imageWorkbench.generated")) : message.error(failed?.reason instanceof Error ? failed.reason.message : t("workbench.generationFailed"));
+            } finally {
+                setRunning(false);
+                currentTaskIdRef.current = undefined;
+            }
+        }).catch((error) => {
+            console.error("Generation error:", error);
+            // updateTaskImage 已经自动处理了失败状态
             setRunning(false);
-        }
+            currentTaskIdRef.current = undefined;
+            message.error(error instanceof Error ? error.message : t("workbench.generationFailed"));
+        });
     };
 
     // Handle image-generation commands from the Agent panel by setting the prompt and optionally starting generation.
@@ -684,6 +827,9 @@ function LogPanel({
     onPreviewLog: (log: GenerationLog) => void;
 }) {
     const { t } = useTranslation();
+    const tasks = useGenerationStore((state) => state.tasks);
+    const activeTasks = tasks.filter((task) => task.status === "running" || task.status === "pending");
+
     const allSelected = Boolean(logs.length) && selectedLogIds.length === logs.length;
     const toggleAll = () => onSelectedLogIdsChange(allSelected ? [] : logs.map((log) => log.id));
 
@@ -693,7 +839,7 @@ function LogPanel({
                 <div>
                     <h2 className="text-base font-semibold">{t("workbench.logs")}</h2>
                 </div>
-                <Tag className="m-0">{logs.length}</Tag>
+                <Tag className="m-0">{logs.length + activeTasks.length}</Tag>
             </div>
             <div className="mb-4 flex flex-wrap gap-2">
                 <Button size="small" icon={<Plus className="size-3.5" />} onClick={onCreateSession}>
@@ -707,6 +853,12 @@ function LogPanel({
                 </Button>
             </div>
             <div className="space-y-3">
+                {/* 显示正在进行的任务 */}
+                {activeTasks.map((task) => (
+                    <ActiveTaskCard key={task.id} task={task} />
+                ))}
+
+                {/* 显示历史日志 */}
                 {logs.map((log) => (
                     <LogCard
                         key={log.id}
@@ -717,7 +869,7 @@ function LogPanel({
                         onClick={() => onPreviewLog(log)}
                     />
                 ))}
-                {!logs.length ? <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed border-stone-300 text-center text-sm text-stone-500 dark:border-stone-700">{t("workbench.noLogs")}</div> : null}
+                {!logs.length && !activeTasks.length ? <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed border-stone-300 text-center text-sm text-stone-500 dark:border-stone-700">{t("workbench.noLogs")}</div> : null}
             </div>
         </>
     );
@@ -770,6 +922,56 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
                 </div>
             </div>
         </button>
+    );
+}
+
+function ActiveTaskCard({ task }: { task: ReturnType<typeof useGenerationStore.getState>["tasks"][number] }) {
+    const { t } = useTranslation();
+    const successImages = task.images.filter((img) => img.status === "success" && img.dataUrl);
+    const thumbnails = successImages.slice(0, 4).map((img) => img.dataUrl);
+    const elapsedMs = Date.now() - task.createdAt;
+
+    return (
+        <div className="block w-full rounded-lg border border-blue-500 bg-blue-50 p-2 dark:border-blue-400 dark:bg-blue-950/30">
+            <div className="grid grid-cols-[minmax(128px,1fr)_auto] gap-2">
+                <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2">
+                    <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" />
+                    <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold leading-5">{task.prompt}</div>
+                        {thumbnails.length ? (
+                            <div className="mt-2 flex gap-1 overflow-hidden">
+                                {thumbnails.map((image, index) => (
+                                    <img key={`${task.id}-${index}`} src={image} alt="" className="size-8 shrink-0 rounded-md object-cover" />
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+                <div className="grid justify-items-end gap-2">
+                    <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="processing">
+                        {t("workbench.generating")}
+                    </Tag>
+                    <div className="flex gap-1">
+                        {task.successCount > 0 && (
+                            <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="blue">
+                                {t("workbench.successCount", { count: task.successCount })}
+                            </Tag>
+                        )}
+                        {task.failCount > 0 && (
+                            <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="red">
+                                {t("workbench.failCount", { count: task.failCount })}
+                            </Tag>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1">
+                        <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{t("workbench.itemCount", { count: task.count })}</Tag>
+                        <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="green">
+                            {formatDuration(elapsedMs)}
+                        </Tag>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 

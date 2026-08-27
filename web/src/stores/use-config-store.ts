@@ -75,35 +75,9 @@ export const defaultConfig: AiConfig = {
     baseUrl: "https://api.panlai.me",
     apiKey: "",
     apiFormat: "openai",
-    channels: [
-        {
-            id: "default",
-            name: "Image2渠道",
-            baseUrl: "https://api.panlai.me",
-            apiKey: "",
-            apiFormat: "openai",
-            models: [
-                { name: "gpt-image-2", capability: "image" },
-            ],
-        },
-        {
-            id: "nano-banana",
-            name: "Nano Banana",
-            baseUrl: "https://api.panlai.me",
-            apiKey: "",
-            apiFormat: "gemini",
-            models: [
-                { name: "gemini-2.5-flash-image", capability: "image" },
-                { name: "gemini-2.5-flash-image-preview", capability: "image" },
-                { name: "gemini-3-pro-image", capability: "image" },
-                { name: "gemini-3-pro-image-preview", capability: "image" },
-                { name: "gemini-3.1-flash-image", capability: "image" },
-                { name: "gemini-3.1-flash-image-preview", capability: "image" },
-            ],
-        },
-    ],
-    model: "default::gpt-image-2",
-    imageModel: "default::gpt-image-2",
+    channels: [],
+    model: "",
+    imageModel: "",
     videoModel: "",
     textModel: "",
     audioModel: "",
@@ -241,6 +215,10 @@ export const useConfigStore = create<ConfigStore>()(
                 const persistedWebdav = (persistedState.webdav || {}) as Partial<WebdavSyncConfig>;
                 const config = { ...defaultConfig, ...persistedConfig };
                 if (!Array.isArray(persistedConfig.channels)) config.channels = [];
+
+                // 移除旧的默认渠道（ID 为 "default" 和 "nano-banana"）
+                config.channels = config.channels.filter((c: ModelChannel) => c.id !== "default" && c.id !== "nano-banana");
+
                 // 把 defaultConfig 中有但用户本地没有的渠道补进去（按 id 判断）
                 const persistedIds = new Set(config.channels.map((c: ModelChannel) => c.id));
                 for (const defaultChannel of defaultConfig.channels) {
