@@ -1,5 +1,5 @@
-import { Bot, Menu, Cloud } from "lucide-react";
-import { Button, Tooltip } from "antd";
+import { Bot, Menu, Cloud, User, LogOut } from "lucide-react";
+import { Button, Tooltip, Dropdown } from "antd";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +8,7 @@ import { AppConfigModal } from "@/components/layout/app-config-modal";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { Sub2ApiLoginModal } from "@/components/layout/sub2api-login-modal";
+import { useUserStore } from "@/stores/use-user-store";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { useAgentStore } from "@/stores/use-agent-store";
@@ -27,6 +28,15 @@ export function AppTopNav() {
     const hideHeader = /^\/canvas\/[^/]+/.test(pathname);
     const slug = pathname.split("/").filter(Boolean)[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
+
+    // 用户登录状态
+    const userInfo = useUserStore((state) => state.userInfo);
+    const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+    const clearUserInfo = useUserStore((state) => state.clearUserInfo);
+
+    const handleLogout = () => {
+        clearUserInfo();
+    };
 
     useEffect(() => {
         if (autoConnectRef.current || agentEnabled || agentConnected || !agentToken.trim()) return;
@@ -85,9 +95,41 @@ export function AppTopNav() {
                         </div>
 
                         <div className="my-auto flex h-9 min-w-0 items-center justify-end gap-2 justify-self-end whitespace-nowrap">
-                            <Button type="primary" icon={<Cloud className="size-4" />} onClick={() => setSub2apiLoginOpen(true)}>
-                                登录同步
-                            </Button>
+                            {isLoggedIn && userInfo ? (
+                                <>
+                                    <Dropdown
+                                        menu={{
+                                            items: [
+                                                {
+                                                    key: "email",
+                                                    label: userInfo.email,
+                                                    disabled: true,
+                                                },
+                                                { type: "divider" },
+                                                {
+                                                    key: "logout",
+                                                    label: t("topNav.logout"),
+                                                    icon: <LogOut className="size-4" />,
+                                                    onClick: handleLogout,
+                                                },
+                                            ],
+                                        }}
+                                        placement="bottomRight"
+                                    >
+                                        <div className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-stone-100 px-3 text-sm font-medium text-stone-700 transition hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700">
+                                            <User className="size-4" />
+                                            {userInfo.username || userInfo.name || userInfo.email}
+                                        </div>
+                                    </Dropdown>
+                                    <div className="flex h-8 items-center justify-center rounded-md bg-blue-500/10 px-3 text-sm font-medium text-blue-500 dark:bg-blue-400/10 dark:text-blue-400">
+                                        ¥{userInfo.balance?.toFixed(2) ?? "0.00"}
+                                    </div>
+                                </>
+                            ) : (
+                                <Button type="primary" icon={<Cloud className="size-4" />} onClick={() => setSub2apiLoginOpen(true)}>
+                                    {t("topNav.userLogin")}
+                                </Button>
+                            )}
                             <Tooltip title={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")}>
                                 <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" icon={<Bot className="size-4" />} onClick={togglePanel} aria-label={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")} />
                             </Tooltip>

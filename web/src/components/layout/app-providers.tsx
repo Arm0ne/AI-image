@@ -10,6 +10,7 @@ import "dayjs/locale/zh-cn";
 import { useTranslation } from "react-i18next";
 
 import { ClientRootInit } from "@/components/layout/client-root-init";
+import { VersionChecker } from "@/components/layout/version-checker";
 import type { AppLocale } from "@/i18n";
 import { getAntThemeConfig } from "@/lib/app-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -47,6 +48,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
             <ProConfigProvider dark={dark}>
                 <App>
                     <QueryClientProvider client={queryClient}>
+                        <VersionChecker />
                         <ClientRootInit>{children}</ClientRootInit>
                     </QueryClientProvider>
                 </App>

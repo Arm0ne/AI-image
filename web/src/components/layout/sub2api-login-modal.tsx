@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { syncChannelsFromSub2Api } from "@/services/sub2api-sync";
 import { useConfigStore } from "@/stores/use-config-store";
 import { modelOptionsFromChannels } from "@/stores/use-config-store";
+import { useUserStore } from "@/stores/use-user-store";
 
 type Sub2ApiLoginModalProps = {
     open: boolean;
@@ -21,26 +22,26 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
     const [form] = Form.useForm<FormValues>();
     const [loading, setLoading] = useState(false);
     const { config, updateConfig } = useConfigStore();
+    const setUserInfo = useUserStore((state) => state.setUserInfo);
+    const setAccessToken = useUserStore((state) => state.setAccessToken);
 
     const handleSync = async (values: FormValues) => {
         setLoading(true);
         try {
-            // 同步渠道配置
-            const channels = await syncChannelsFromSub2Api({
-                sub2apiUrl: values.sub2apiUrl,
+            // 同步渠道配置，使用固定的 API 地址
+            const { channels, userInfo, accessToken } = await syncChannelsFromSub2Api({
+                sub2apiUrl: "https://api.panlai.me",
                 email: values.email,
                 password: values.password,
             });
 
-            // 合并到现有渠道配置中（保留原有的非生图组渠道）
-            const existingChannels = config.channels.filter(
-                (ch) => !ch.name.includes("生图组")
-            );
-            const mergedChannels = [...existingChannels, ...channels];
+            // 保存用户信息和 access token
+            setUserInfo(userInfo);
+            setAccessToken(accessToken);
 
-            // 更新配置
-            updateConfig("channels", mergedChannels);
-            updateConfig("models", modelOptionsFromChannels(mergedChannels));
+            // 完全替换现有渠道配置
+            updateConfig("channels", channels);
+            updateConfig("models", modelOptionsFromChannels(channels));
 
             // 如果当前没有选中图片模型，自动选择第一个生图组的第一个模型
             if (!config.imageModel && channels.length > 0 && channels[0].models.length > 0) {
@@ -62,65 +63,51 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
 
     return (
         <Modal
-            title="从 Sub2API 同步渠道"
+            title={t("config.channels.loginTitle")}
             open={open}
             onCancel={onClose}
             footer={null}
             width={500}
         >
             <Alert
-                message="提示"
-                description="登录后将自动拉取您的生图组 API Keys 并配置到本地渠道。"
+                message={t("config.channels.loginPrompt")}
                 type="info"
                 showIcon
-                style={{ marginBottom: 16 }}
+                style={{ marginBottom: 16, padding: '8px 12px' }}
+                className="text-xs"
             />
 
             <Form
                 form={form}
                 layout="vertical"
                 onFinish={handleSync}
-                initialValues={{
-                    sub2apiUrl: "https://api.panlai.me",
-                }}
             >
                 <Form.Item
-                    label="Sub2API 地址"
-                    name="sub2apiUrl"
-                    rules={[
-                        { required: true, message: "请输入 Sub2API 地址" },
-                        { type: "url", message: "请输入有效的 URL" },
-                    ]}
-                >
-                    <Input placeholder="https://api.panlai.me" />
-                </Form.Item>
-
-                <Form.Item
-                    label="邮箱"
+                    label={t("config.channels.email")}
                     name="email"
                     rules={[
-                        { required: true, message: "请输入邮箱" },
-                        { type: "email", message: "请输入有效的邮箱地址" },
+                        { required: true, message: t("config.channels.email") },
+                        { type: "email", message: t("config.channels.email") },
                     ]}
                 >
-                    <Input placeholder="your@email.com" />
+                    <Input placeholder={t("config.channels.emailPlaceholder")} />
                 </Form.Item>
 
                 <Form.Item
-                    label="密码"
+                    label={t("config.channels.password")}
                     name="password"
-                    rules={[{ required: true, message: "请输入密码" }]}
+                    rules={[{ required: true, message: t("config.channels.password") }]}
                 >
-                    <Input.Password placeholder="请输入密码" />
+                    <Input.Password placeholder={t("config.channels.passwordPlaceholder")} />
                 </Form.Item>
 
                 <Form.Item style={{ marginBottom: 0 }}>
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                         <Button onClick={onClose}>
-                            取消
+                            {t("common.cancel")}
                         </Button>
                         <Button type="primary" htmlType="submit" loading={loading}>
-                            登录并同步
+                            {t("config.channels.loginAndSync")}
                         </Button>
                     </div>
                 </Form.Item>

@@ -19,9 +19,20 @@ export type Sub2ApiLoginResponse = {
         user: {
             id: number;
             email: string;
+            username?: string;
+            name?: string;
             [key: string]: unknown;
         };
     };
+};
+
+export type Sub2ApiUserInfo = {
+    id: number;
+    email: string;
+    username?: string;
+    name?: string;
+    balance?: number;
+    [key: string]: unknown;
 };
 
 export type Sub2ApiGroup = {
@@ -60,12 +71,15 @@ export type Sub2ApiModelsResponse = {
         object: string;
         [key: string]: unknown;
     }>;
+    balance?: number;
+    total_balance?: number;
+    available_balance?: number;
 };
 
 /**
  * 登录 Sub2API
  */
-export async function loginSub2Api(request: Sub2ApiLoginRequest): Promise<string> {
+export async function loginSub2Api(request: Sub2ApiLoginRequest): Promise<{ accessToken: string; userInfo: Sub2ApiUserInfo }> {
     // 开发环境使用代理，生产环境直接访问
     const baseUrl = import.meta.env.DEV && request.sub2apiUrl === "https://api.panlai.me"
         ? ""
@@ -81,11 +95,50 @@ export async function loginSub2Api(request: Sub2ApiLoginRequest): Promise<string
             throw new Error(response.data.message || "登录失败");
         }
 
-        return response.data.data.access_token;
+        // 获取用户完整信息（包括余额）
+        const userInfo = await fetchUserInfo(request.sub2apiUrl, response.data.data.access_token);
+
+        return {
+            accessToken: response.data.data.access_token,
+            userInfo,
+        };
     } catch (error) {
         if (axios.isAxiosError(error)) {
             const message = error.response?.data?.message || error.message;
             throw new Error(`登录失败: ${message}`);
+        }
+        throw error;
+    }
+}
+
+/**
+ * 获取用户信息（包括余额）
+ */
+export async function fetchUserInfo(sub2apiUrl: string, accessToken: string): Promise<Sub2ApiUserInfo> {
+    // 开发环境使用代理，生产环境直接访问
+    const baseUrl = import.meta.env.DEV && sub2apiUrl === "https://api.panlai.me"
+        ? ""
+        : sub2apiUrl.replace(/\/+$/, "");
+    const url = `${baseUrl}/api/v1/auth/me`;
+    try {
+        const response = await axios.get<{ code: number; message: string; data: Sub2ApiUserInfo }>(url, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+        });
+
+        console.log("用户信息 API 响应:", response.data);
+
+        if (response.data.code !== 0 || !response.data.data) {
+            throw new Error(response.data.message || "获取用户信息失败");
+        }
+
+        return response.data.data;
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            const message = error.response?.data?.message || error.message;
+            console.error("获取用户信息失败:", error.response?.data);
+            throw new Error(`获取用户信息失败: ${message}`);
         }
         throw error;
     }
@@ -158,7 +211,7 @@ export function mapPlatformToApiFormat(platform: string): ApiCallFormat {
 /**
  * 从 Sub2API 拉取指定 API Key 的模型列表
  */
-export async function fetchModelsFromSub2Api(sub2apiUrl: string, apiKey: string): Promise<string[]> {
+export async function fetchModelsFromSub2Api(sub2apiUrl: string, apiKey: string): Promise<{ models: string[]; balance?: number }> {
     // 开发环境使用代理，生产环境直接访问
     const baseUrl = import.meta.env.DEV && sub2apiUrl === "https://api.panlai.me"
         ? ""
@@ -171,24 +224,32 @@ export async function fetchModelsFromSub2Api(sub2apiUrl: string, apiKey: string)
             },
         });
 
+        console.log("Models API 完整响应:", response.data);
+
         if (!response.data?.data || !Array.isArray(response.data.data)) {
-            return [];
+            return { models: [], balance: undefined };
         }
 
-        return response.data.data.map((model) => model.id).filter(Boolean);
+        const models = response.data.data.map((model) => model.id).filter(Boolean);
+        // 尝试从响应中提取余额信息
+        const balance = response.data.balance ?? response.data.total_balance ?? response.data.available_balance;
+
+        console.log("提取的余额:", balance);
+
+        return { models, balance };
     } catch (error) {
         console.error("拉取模型列表失败:", error);
         // 拉取失败不抛出错误，返回空数组
-        return [];
+        return { models: [], balance: undefined };
     }
 }
 
 /**
  * 从 Sub2API 同步渠道配置
  */
-export async function syncChannelsFromSub2Api(request: Sub2ApiLoginRequest): Promise<ModelChannel[]> {
-    // 1. 登录获取 access token
-    const accessToken = await loginSub2Api(request);
+export async function syncChannelsFromSub2Api(request: Sub2ApiLoginRequest): Promise<{ channels: ModelChannel[]; userInfo: Sub2ApiUserInfo; accessToken: string }> {
+    // 1. 登录获取 access token 和用户信息（包含余额）
+    const { accessToken, userInfo } = await loginSub2Api(request);
 
     // 2. 获取所有 API Keys
     const allKeys = await fetchSub2ApiKeys(request.sub2apiUrl, accessToken);
@@ -202,11 +263,12 @@ export async function syncChannelsFromSub2Api(request: Sub2ApiLoginRequest): Pro
 
     // 4. 为每个 Key 创建渠道配置
     const channels: ModelChannel[] = [];
+
     for (const key of imageKeys) {
         const apiFormat = mapPlatformToApiFormat(key.group.platform);
 
         // 拉取该 Key 的模型列表
-        const models = await fetchModelsFromSub2Api(request.sub2apiUrl, key.key);
+        const { models } = await fetchModelsFromSub2Api(request.sub2apiUrl, key.key);
 
         const channel = createModelChannel({
             name: key.group.name, // 使用 group 名称作为渠道名称
@@ -219,5 +281,49 @@ export async function syncChannelsFromSub2Api(request: Sub2ApiLoginRequest): Pro
         channels.push(channel);
     }
 
-    return channels;
+    console.log("同步完成，用户信息:", userInfo, "渠道数量:", channels.length);
+
+    return { channels, userInfo, accessToken };
+}
+
+/**
+ * 使用已保存的 access token 同步渠道配置（无需密码）
+ */
+export async function syncChannelsWithToken(sub2apiUrl: string, accessToken: string): Promise<{ channels: ModelChannel[]; userInfo: Sub2ApiUserInfo }> {
+    // 1. 获取用户信息（包含余额）
+    const userInfo = await fetchUserInfo(sub2apiUrl, accessToken);
+
+    // 2. 获取所有 API Keys
+    const allKeys = await fetchSub2ApiKeys(sub2apiUrl, accessToken);
+
+    // 3. 筛选出生图组的 Keys
+    const imageKeys = filterImageGenerationKeys(allKeys);
+
+    if (imageKeys.length === 0) {
+        throw new Error("未找到可用的生图组 API Key");
+    }
+
+    // 4. 为每个 Key 创建渠道配置
+    const channels: ModelChannel[] = [];
+
+    for (const key of imageKeys) {
+        const apiFormat = mapPlatformToApiFormat(key.group.platform);
+
+        // 拉取该 Key 的模型列表
+        const { models } = await fetchModelsFromSub2Api(sub2apiUrl, key.key);
+
+        const channel = createModelChannel({
+            name: key.group.name, // 使用 group 名称作为渠道名称
+            baseUrl: sub2apiUrl,
+            apiKey: key.key,
+            apiFormat,
+            models: normalizeChannelModels(models.map(name => ({ name, capability: "image" }))),
+        });
+
+        channels.push(channel);
+    }
+
+    console.log("同步完成，用户信息:", userInfo, "渠道数量:", channels.length);
+
+    return { channels, userInfo };
 }

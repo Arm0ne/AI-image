@@ -325,6 +325,8 @@ export default {
         shortcuts: "快捷键",
         lightTheme: "切换到浅色主题",
         darkTheme: "切换到深色主题",
+        userLogin: "用户登录",
+        logout: "退出登录",
     },
     home: {
         description: "在 <canvas>无限画布</canvas> 中生成、连接和重组 <content>图片、文字与图形</content>，让创作从单次生成变成连续推演。",
@@ -393,6 +395,14 @@ export default {
             defaultName: "Image2渠道",
             newName: "新渠道",
             indexedName: "渠道 {{index}}",
+            syncFromAlienApi: "从 Alien API 同步",
+            loginPrompt: "登录后将自动拉取您的生图组 API 密钥并配置到本地渠道。（请务必先在Alien API站点创建API密钥并选择正确的生图分组）",
+            loginTitle: "登录您的 Alien API 账号",
+            email: "邮箱",
+            password: "密码",
+            emailPlaceholder: "your@email.com",
+            passwordPlaceholder: "请输入密码",
+            loginAndSync: "登录并同步",
         },
         preferences: {
             interface: "界面偏好",

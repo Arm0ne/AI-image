@@ -325,6 +325,8 @@ export default {
         shortcuts: "Keyboard shortcuts",
         lightTheme: "Switch to light theme",
         darkTheme: "Switch to dark theme",
+        userLogin: "User Login",
+        logout: "Logout",
     },
     home: {
         description: "Generate, connect, and reshape <content>images, text, and graphics</content> in <canvas>Infinite Canvas</canvas>, turning one-off generations into a continuous creative process.",
@@ -393,6 +395,14 @@ export default {
             defaultName: "Image2 Channel",
             newName: "New provider",
             indexedName: "Provider {{index}}",
+            syncFromAlienApi: "Sync from Alien API",
+            loginPrompt: "After logging in, your image generation group API keys will be automatically fetched and configured to local channels. (Please create API keys on the Alien API site first and select the correct image generation group)",
+            loginTitle: "Login to Your Alien API Account",
+            email: "Email",
+            password: "Password",
+            emailPlaceholder: "your@email.com",
+            passwordPlaceholder: "Enter your password",
+            loginAndSync: "Login and Sync",
         },
         preferences: {
             interface: "Interface",

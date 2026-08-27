@@ -1,18 +1,47 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
-export type LocalUser = {
-    id: string;
-    username: string;
-    displayName: string;
-    avatarUrl: string;
+export type UserInfo = {
+    id: number;
+    email: string;
+    username?: string;
+    name?: string;
+    balance?: number;
 };
 
 type UserStore = {
-    user: LocalUser | null;
-    clearSession: () => void;
+    userInfo: UserInfo | null;
+    accessToken: string | null;
+    isLoggedIn: boolean;
+    setUserInfo: (userInfo: UserInfo) => void;
+    setAccessToken: (token: string) => void;
+    clearUserInfo: () => void;
 };
 
-export const useUserStore = create<UserStore>()((set) => ({
-    user: null,
-    clearSession: () => set({ user: null }),
-}));
+export const useUserStore = create<UserStore>()(
+    persist(
+        (set) => ({
+            userInfo: null,
+            accessToken: null,
+            isLoggedIn: false,
+            setUserInfo: (userInfo) =>
+                set({
+                    userInfo,
+                    isLoggedIn: true,
+                }),
+            setAccessToken: (token) =>
+                set({
+                    accessToken: token,
+                }),
+            clearUserInfo: () =>
+                set({
+                    userInfo: null,
+                    accessToken: null,
+                    isLoggedIn: false,
+                }),
+        }),
+        {
+            name: "infinite-canvas:user_store",
+        },
+    ),
+);

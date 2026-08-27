@@ -14,6 +14,8 @@ import { syncAppDataToWebdav, type AppSyncDomainKey, type AppSyncProgressEvent }
 import { testWebdavConnection, WEBDAV_MANIFEST_FILE_NAME } from "@/services/webdav-sync";
 import { audioFormatOptions, audioVoiceOptions, normalizeAudioSpeedValue } from "@/lib/audio-generation";
 import { createModelChannel, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
+import { useUserStore } from "@/stores/use-user-store";
+import { syncChannelsFromSub2Api, syncChannelsWithToken } from "@/services/sub2api-sync";
 
 type ModelGroup = {
     capability: ModelCapability;
@@ -57,6 +59,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     const [webdavSyncStatus, setWebdavSyncStatus] = useState("");
     const [webdavDomainProgress, setWebdavDomainProgress] = useState(createWebdavDomainProgress);
     const [sub2apiLoginOpen, setSub2apiLoginOpen] = useState(false);
+    const [syncingChannels, setSyncingChannels] = useState(false);
     const config = useConfigStore((state) => state.config);
     const webdav = useConfigStore((state) => state.webdav);
     const updateConfig = useConfigStore((state) => state.updateConfig);
@@ -64,6 +67,10 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     const shouldPromptContinue = useConfigStore((state) => state.shouldPromptContinue);
     const setConfigDialogOpen = useConfigStore((state) => state.setConfigDialogOpen);
     const clearPromptContinue = useConfigStore((state) => state.clearPromptContinue);
+    const userInfo = useUserStore((state) => state.userInfo);
+    const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+    const accessToken = useUserStore((state) => state.accessToken);
+    const setUserInfo = useUserStore((state) => state.setUserInfo);
     const webdavReady = Boolean(webdav.url.trim());
     const editingChannel = config.channels.find((channel) => channel.id === editingChannelId) || null;
     const locale = i18n.resolvedLanguage as AppLocale;
@@ -106,6 +113,38 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
 
     const saveChannel = (channel: ModelChannel) => {
         updateChannels(config.channels.map((item) => (item.id === channel.id ? channel : item)));
+    };
+
+    const handleSyncChannels = async () => {
+        // 如果未登录，打开登录弹窗
+        if (!isLoggedIn || !userInfo || !accessToken) {
+            setSub2apiLoginOpen(true);
+            return;
+        }
+
+        // 已登录，使用保存的 token 直接同步
+        setSyncingChannels(true);
+        try {
+            const { channels, userInfo: updatedUserInfo } = await syncChannelsWithToken(
+                "https://api.panlai.me",
+                accessToken
+            );
+
+            // 更新用户信息
+            setUserInfo(updatedUserInfo);
+
+            // 完全替换现有渠道配置
+            updateConfig("channels", channels);
+            updateConfig("models", modelOptionsFromChannels(channels));
+
+            message.success(`成功同步 ${channels.length} 个生图组渠道`);
+        } catch (error) {
+            // 如果同步失败（可能是 token 过期），提示重新登录
+            message.error(error instanceof Error ? error.message : "同步失败，请重新登录");
+            setSub2apiLoginOpen(true);
+        } finally {
+            setSyncingChannels(false);
+        }
     };
 
     const testWebdav = async () => {
@@ -184,8 +223,8 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                                     <div className="text-xs text-stone-500">{t("config.channels.description")}</div>
                                     <div className="flex gap-2">
-                                        <Button type="primary" icon={<Cloud className="size-4" />} onClick={() => setSub2apiLoginOpen(true)}>
-                                            从 Sub2API 同步
+                                        <Button type="primary" icon={<Cloud className="size-4" />} loading={syncingChannels} onClick={handleSyncChannels}>
+                                            {t("config.channels.syncFromAlienApi")}
                                         </Button>
                                     </div>
                                 </div>
