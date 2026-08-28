@@ -1,6 +1,6 @@
 export default {
     meta: {
-        title: "Infinite Canvas",
+        title: "Alien Canvas",
         description: "An infinite canvas creation tool",
     },
     theme: { toggle: "Toggle theme" },
@@ -325,11 +325,12 @@ export default {
         shortcuts: "Keyboard shortcuts",
         lightTheme: "Switch to light theme",
         darkTheme: "Switch to dark theme",
+        login: "Login",
         userLogin: "User Login",
         logout: "Logout",
     },
     home: {
-        description: "Generate, connect, and reshape <content>images, text, and graphics</content> in <canvas>Infinite Canvas</canvas>, turning one-off generations into a continuous creative process.",
+        description: "Generate, connect, and reshape <content>images, text, and graphics</content> in <canvas>Alien Canvas</canvas>, turning one-off generations into a continuous creative process.",
         start: "Get started",
         openCanvas: "Open canvas",
         openImageWorkbench: "Image Workbench",

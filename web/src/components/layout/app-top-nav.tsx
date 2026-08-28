@@ -126,14 +126,19 @@ export function AppTopNav() {
                                     </div>
                                 </>
                             ) : (
-                                <Button type="primary" icon={<Cloud className="size-4" />} onClick={() => setSub2apiLoginOpen(true)}>
-                                    {t("topNav.userLogin")}
+                                <Button
+                                    type="primary"
+                                    icon={<Cloud className="size-4" />}
+                                    onClick={() => setSub2apiLoginOpen(true)}
+                                >
+                                    <span className="md:hidden">{t("topNav.login")}</span>
+                                    <span className="hidden md:inline">{t("topNav.userLogin")}</span>
                                 </Button>
                             )}
                             <Tooltip title={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")}>
                                 <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" icon={<Bot className="size-4" />} onClick={togglePanel} aria-label={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")} />
                             </Tooltip>
-                            <UserStatusActions />
+                            <UserStatusActions showConfig={false} />
                         </div>
                     </div>
                 </header>

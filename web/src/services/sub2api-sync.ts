@@ -261,25 +261,23 @@ export async function syncChannelsFromSub2Api(request: Sub2ApiLoginRequest): Pro
         throw new Error("未找到可用的生图组 API Key");
     }
 
-    // 4. 为每个 Key 创建渠道配置
-    const channels: ModelChannel[] = [];
+    // 4. 为每个 Key 创建渠道配置（并行拉取模型列表）
+    const channels: ModelChannel[] = await Promise.all(
+        imageKeys.map(async (key) => {
+            const apiFormat = mapPlatformToApiFormat(key.group.platform);
 
-    for (const key of imageKeys) {
-        const apiFormat = mapPlatformToApiFormat(key.group.platform);
+            // 拉取该 Key 的模型列表
+            const { models } = await fetchModelsFromSub2Api(request.sub2apiUrl, key.key);
 
-        // 拉取该 Key 的模型列表
-        const { models } = await fetchModelsFromSub2Api(request.sub2apiUrl, key.key);
-
-        const channel = createModelChannel({
-            name: key.group.name, // 使用 group 名称作为渠道名称
-            baseUrl: request.sub2apiUrl,
-            apiKey: key.key,
-            apiFormat,
-            models: normalizeChannelModels(models.map(name => ({ name, capability: "image" }))),
-        });
-
-        channels.push(channel);
-    }
+            return createModelChannel({
+                name: key.group.name, // 使用 group 名称作为渠道名称
+                baseUrl: request.sub2apiUrl,
+                apiKey: key.key,
+                apiFormat,
+                models: normalizeChannelModels(models.map(name => ({ name, capability: "image" }))),
+            });
+        })
+    );
 
     console.log("同步完成，用户信息:", userInfo, "渠道数量:", channels.length);
 
@@ -303,25 +301,23 @@ export async function syncChannelsWithToken(sub2apiUrl: string, accessToken: str
         throw new Error("未找到可用的生图组 API Key");
     }
 
-    // 4. 为每个 Key 创建渠道配置
-    const channels: ModelChannel[] = [];
+    // 4. 为每个 Key 创建渠道配置（并行拉取模型列表）
+    const channels: ModelChannel[] = await Promise.all(
+        imageKeys.map(async (key) => {
+            const apiFormat = mapPlatformToApiFormat(key.group.platform);
 
-    for (const key of imageKeys) {
-        const apiFormat = mapPlatformToApiFormat(key.group.platform);
+            // 拉取该 Key 的模型列表
+            const { models } = await fetchModelsFromSub2Api(sub2apiUrl, key.key);
 
-        // 拉取该 Key 的模型列表
-        const { models } = await fetchModelsFromSub2Api(sub2apiUrl, key.key);
-
-        const channel = createModelChannel({
-            name: key.group.name, // 使用 group 名称作为渠道名称
-            baseUrl: sub2apiUrl,
-            apiKey: key.key,
-            apiFormat,
-            models: normalizeChannelModels(models.map(name => ({ name, capability: "image" }))),
-        });
-
-        channels.push(channel);
-    }
+            return createModelChannel({
+                name: key.group.name, // 使用 group 名称作为渠道名称
+                baseUrl: sub2apiUrl,
+                apiKey: key.key,
+                apiFormat,
+                models: normalizeChannelModels(models.map(name => ({ name, capability: "image" }))),
+            });
+        })
+    );
 
     console.log("同步完成，用户信息:", userInfo, "渠道数量:", channels.length);
 
