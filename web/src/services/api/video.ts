@@ -5,6 +5,7 @@ import i18n from "@/i18n";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
+import { requestUserInfoRefresh } from "@/services/sub2api-sync";
 import { boolConfig, buildApiUrl, modelOptionName, resolveModelRequestConfig, resolveModelScript, type AiConfig } from "@/stores/use-config-store";
 import { runModelPlugin } from "./model-plugin";
 import type { ReferenceImage } from "@/types/image";
@@ -38,7 +39,10 @@ export async function requestVideoGeneration(config: AiConfig, prompt: string, r
     for (let attempt = 0; attempt < 120; attempt += 1) {
         if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const state = await pollVideoGenerationTask(config, task, options);
-        if (state.status === "completed") return state.result;
+        if (state.status === "completed") {
+            requestUserInfoRefresh();
+            return state.result;
+        }
         if (state.status === "failed") throw new Error(state.error);
         if (attempt === 119) throw new Error(apiText("videoTimeout", { provider: "" }));
         await delay(2500, options?.signal);

@@ -2,6 +2,14 @@ import axios from "axios";
 import type { AiConfig, ApiCallFormat, ModelChannel } from "@/stores/use-config-store";
 import { createModelChannel, normalizeChannelModels, resolveApiBaseUrl } from "@/stores/use-config-store";
 
+export const SUB2API_URL = "https://api.panlai.me";
+export const USER_INFO_REFRESH_EVENT = "infinite-canvas:refresh-user-info";
+
+/** Ask the app shell to refresh the logged-in user's balance without coupling API services to UI state. */
+export function requestUserInfoRefresh() {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(USER_INFO_REFRESH_EVENT));
+}
+
 export type Sub2ApiLoginRequest = {
     email: string;
     password: string;
@@ -111,7 +119,7 @@ export async function loginSub2Api(request: Sub2ApiLoginRequest): Promise<{ acce
 /**
  * 获取用户信息（包括余额）
  */
-export async function fetchUserInfo(sub2apiUrl: string, accessToken: string): Promise<Sub2ApiUserInfo> {
+export async function fetchUserInfo(sub2apiUrl: string, accessToken: string, options?: { signal?: AbortSignal }): Promise<Sub2ApiUserInfo> {
     const baseUrl = resolveApiBaseUrl(sub2apiUrl);
     const url = `${baseUrl}/api/v1/auth/me`;
     try {
@@ -119,9 +127,8 @@ export async function fetchUserInfo(sub2apiUrl: string, accessToken: string): Pr
             headers: {
                 Authorization: `Bearer ${accessToken}`,
             },
+            signal: options?.signal,
         });
-
-        console.log("用户信息 API 响应:", response.data);
 
         if (response.data.code !== 0 || !response.data.data) {
             throw new Error(response.data.message || "获取用户信息失败");

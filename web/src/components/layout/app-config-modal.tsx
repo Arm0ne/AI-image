@@ -15,7 +15,7 @@ import { testWebdavConnection, WEBDAV_MANIFEST_FILE_NAME } from "@/services/webd
 import { audioFormatOptions, audioVoiceOptions, normalizeAudioSpeedValue } from "@/lib/audio-generation";
 import { createModelChannel, modelOptionsFromChannels, normalizeModelOptionValue, preferredImageModelFromChannels, selectableModelsByCapability, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
-import { syncChannelsFromSub2Api, syncChannelsWithToken } from "@/services/sub2api-sync";
+import { SUB2API_URL, syncChannelsFromSub2Api, syncChannelsWithToken } from "@/services/sub2api-sync";
 
 type ModelGroup = {
     capability: ModelCapability;
@@ -126,7 +126,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
         setSyncingChannels(true);
         try {
             const { channels, userInfo: updatedUserInfo } = await syncChannelsWithToken(
-                "https://api.panlai.me",
+                SUB2API_URL,
                 accessToken
             );
 

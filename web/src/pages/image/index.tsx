@@ -332,16 +332,20 @@ export default function ImagePage() {
             // 自动保存到资产库
             logImages.forEach((image) => {
                 addAsset({
-                    id: nanoid(),
-                    name: `${text.slice(0, 30)}${text.length > 30 ? "..." : ""}`,
-                    url: image.dataUrl,
-                    storageKey: image.storageKey,
-                    type: "image",
-                    width: image.width,
-                    height: image.height,
-                    bytes: image.bytes,
-                    mimeType: image.mimeType,
-                    createdAt: Date.now(),
+                    kind: "image",
+                    title: `${text.slice(0, 30)}${text.length > 30 ? "..." : ""}`,
+                    coverUrl: image.dataUrl,
+                    tags: [],
+                    source: t("imageWorkbench.source"),
+                    data: {
+                        dataUrl: image.dataUrl,
+                        storageKey: image.storageKey,
+                        width: image.width,
+                        height: image.height,
+                        bytes: image.bytes,
+                        mimeType: image.mimeType || "image/png",
+                    },
+                    metadata: { source: "image-page", prompt: text },
                 });
             });
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Modal, Form, Input, Button, message, Alert } from "antd";
+import { App, Modal, Form, Input, Button, Alert } from "antd";
 import { useTranslation } from "react-i18next";
-import { syncChannelsFromSub2Api } from "@/services/sub2api-sync";
+import { SUB2API_URL, syncChannelsFromSub2Api } from "@/services/sub2api-sync";
 import { modelOptionsFromChannels, preferredImageModelFromChannels, useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -18,6 +18,7 @@ type FormValues = {
 
 export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
     const { t } = useTranslation();
+    const { message } = App.useApp();
     const [form] = Form.useForm<FormValues>();
     const [loading, setLoading] = useState(false);
     const updateConfig = useConfigStore((state) => state.updateConfig);
@@ -29,7 +30,7 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
         try {
             // 同步渠道配置，使用固定的 API 地址
             const { channels, userInfo, accessToken } = await syncChannelsFromSub2Api({
-                sub2apiUrl: "https://api.panlai.me",
+                sub2apiUrl: SUB2API_URL,
                 email: values.email,
                 password: values.password,
             });
@@ -69,7 +70,7 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
             width={500}
         >
             <Alert
-                message={
+                title={
                     <>
                         登录后将自动拉取您的生图组 API 密钥并配置到工作台
                         <br />

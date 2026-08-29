@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
+import { requestUserInfoRefresh } from "@/services/sub2api-sync";
 import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -777,14 +778,18 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 params: { size: requestSize, quality, count: n, ...(background ? { background } : {}) },
                 signal: options?.signal,
             });
-            return normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
+            const images = normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
+            requestUserInfoRefresh();
+            return images;
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }
     }
     if (requestConfig.apiFormat === "gemini") {
         try {
-            return await requestGeminiImages(requestConfig, prompt, [], n, options);
+            const images = await requestGeminiImages(requestConfig, prompt, [], n, options);
+            requestUserInfoRefresh();
+            return images;
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }
@@ -811,6 +816,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
             },
         );
         const images = parseImagePayload(response.data);
+        requestUserInfoRefresh();
         return images;
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("requestFailed")));
@@ -837,7 +843,9 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                 params: { size: requestSize, quality, count: n, ...(background ? { background } : {}) },
                 signal: options?.signal,
             });
-            return normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
+            const images = normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
+            requestUserInfoRefresh();
+            return images;
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }
@@ -845,7 +853,9 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     if (requestConfig.apiFormat === "gemini") {
         if (mask) throw new Error(apiText("geminiMaskUnsupported"));
         try {
-            return await requestGeminiImages(requestConfig, requestPrompt, references, n, options);
+            const images = await requestGeminiImages(requestConfig, requestPrompt, references, n, options);
+            requestUserInfoRefresh();
+            return images;
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }
@@ -876,7 +886,9 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                     signal: options?.signal,
                 },
             );
-            return parseImagePayload(response.data);
+            const images = parseImagePayload(response.data);
+            requestUserInfoRefresh();
+            return images;
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }
@@ -907,6 +919,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     try {
         const response = await axios.post<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), formData, { headers: aiHeaders(requestConfig), signal: options?.signal });
         const images = parseImagePayload(response.data);
+        requestUserInfoRefresh();
         return images;
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("requestFailed")));
@@ -928,6 +941,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
             });
             const text = String(answer ?? "").trim() || apiText("noContent");
             if (text === apiText("noContent")) onDelta(text);
+            requestUserInfoRefresh();
             return text;
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
@@ -937,6 +951,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
         if (requestConfig.apiFormat === "gemini") {
             const answer = (await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages), onDelta, options)).content || apiText("noContent");
             if (answer === apiText("noContent")) onDelta(answer);
+            requestUserInfoRefresh();
             return answer;
         }
         const answer = (await requestStreamingResponse(requestConfig, {
@@ -945,6 +960,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
             ...(requestConfig.reasoningEffort === "auto" ? {} : { reasoning: { effort: requestConfig.reasoningEffort } }),
         }, onDelta, options)).content || apiText("noContent");
         if (answer === apiText("noContent")) onDelta(answer);
+        requestUserInfoRefresh();
         return answer;
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("requestFailed")));

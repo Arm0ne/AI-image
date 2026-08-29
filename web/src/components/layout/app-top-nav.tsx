@@ -10,7 +10,8 @@ import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { Sub2ApiLoginModal } from "@/components/layout/sub2api-login-modal";
 import { useUserStore } from "@/stores/use-user-store";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { fetchUserInfo, SUB2API_URL, USER_INFO_REFRESH_EVENT } from "@/services/sub2api-sync";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAgentStore } from "@/stores/use-agent-store";
 import { useConfigStore } from "@/stores/use-config-store";
 
@@ -33,13 +34,60 @@ export function AppTopNav() {
     // 用户登录状态
     const userInfo = useUserStore((state) => state.userInfo);
     const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+    const accessToken = useUserStore((state) => state.accessToken);
     const clearUserInfo = useUserStore((state) => state.clearUserInfo);
+    const setUserInfo = useUserStore((state) => state.setUserInfo);
     const clearAiCredentials = useConfigStore((state) => state.clearAiCredentials);
+    const balanceRefreshRef = useRef<{ token: string; promise: Promise<void> } | null>(null);
 
     const handleLogout = () => {
         clearAiCredentials();
         clearUserInfo();
     };
+
+    const refreshUserBalance = useCallback(async () => {
+        const current = useUserStore.getState();
+        if (!current.isLoggedIn || !current.accessToken) return;
+
+        const tokenAtStart = current.accessToken;
+        if (balanceRefreshRef.current?.token === tokenAtStart) return balanceRefreshRef.current.promise;
+        const request = fetchUserInfo(SUB2API_URL, tokenAtStart)
+            .then((updatedUserInfo) => {
+                // Do not restore an old session if the user logged out while the request was in flight.
+                const latest = useUserStore.getState();
+                if (latest.isLoggedIn && latest.accessToken === tokenAtStart) {
+                    setUserInfo({ ...latest.userInfo, ...updatedUserInfo });
+                }
+            })
+            .catch((error) => {
+                // A background refresh must never interrupt the user's current workflow.
+                console.warn("刷新用户余额失败:", error);
+            });
+        balanceRefreshRef.current = { token: tokenAtStart, promise: request };
+        void request.finally(() => {
+            if (balanceRefreshRef.current?.promise === request) balanceRefreshRef.current = null;
+        });
+        return request;
+    }, [setUserInfo]);
+
+    useEffect(() => {
+        if (!isLoggedIn || !accessToken) return;
+
+        const refreshWhenVisible = () => {
+            if (document.visibilityState === "visible") void refreshUserBalance();
+        };
+        void refreshUserBalance();
+        const interval = window.setInterval(refreshWhenVisible, 60_000);
+        window.addEventListener("focus", refreshWhenVisible);
+        window.addEventListener(USER_INFO_REFRESH_EVENT, refreshWhenVisible);
+        document.addEventListener("visibilitychange", refreshWhenVisible);
+        return () => {
+            window.clearInterval(interval);
+            window.removeEventListener("focus", refreshWhenVisible);
+            window.removeEventListener(USER_INFO_REFRESH_EVENT, refreshWhenVisible);
+            document.removeEventListener("visibilitychange", refreshWhenVisible);
+        };
+    }, [accessToken, isLoggedIn, refreshUserBalance]);
 
     useEffect(() => {
         if (autoConnectRef.current || agentEnabled || agentConnected || !agentToken.trim()) return;

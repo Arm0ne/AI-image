@@ -41,7 +41,7 @@ export function VersionChecker() {
             width={500}
         >
             <Alert
-                message={t("versionChecker.description")}
+                title={t("versionChecker.description")}
                 type="info"
                 showIcon
                 className="text-xs"
