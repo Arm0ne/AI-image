@@ -329,26 +329,6 @@ export default function ImagePage() {
                 }),
             );
 
-            // 自动保存到资产库
-            logImages.forEach((image) => {
-                addAsset({
-                    kind: "image",
-                    title: `${text.slice(0, 30)}${text.length > 30 ? "..." : ""}`,
-                    coverUrl: image.dataUrl,
-                    tags: [],
-                    source: t("imageWorkbench.source"),
-                    data: {
-                        dataUrl: image.dataUrl,
-                        storageKey: image.storageKey,
-                        width: image.width,
-                        height: image.height,
-                        bytes: image.bytes,
-                        mimeType: image.mimeType || "image/png",
-                    },
-                    metadata: { source: "image-page", prompt: text },
-                });
-            });
-
             // 不需要手动更新任务状态，updateTaskImage 已经自动处理了
 
             successCount ? message.success(t("imageWorkbench.generated")) : message.error(failed?.reason instanceof Error ? failed.reason.message : t("workbench.generationFailed"));
