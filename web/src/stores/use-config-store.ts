@@ -4,6 +4,7 @@ import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
+import { PANLAI_API_PROXY_PATH } from "@/constant/runtime-config";
 
 export type ApiCallFormat = "openai" | "gemini" | "grok" | "seedance";
 export type ModelCapability = "image" | "video" | "text" | "audio";
@@ -69,6 +70,7 @@ const OPENAI_BASE_URL = "https://api.panlai.me";
 const GEMINI_BASE_URL = "https://api.panlai.me";
 const GROK_BASE_URL = "https://api.panlai.me";
 const SEEDANCE_BASE_URL = "https://api.panlai.me";
+const PANLAI_API_ORIGIN = "https://api.panlai.me";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
@@ -381,14 +383,16 @@ function uniqueModelOptions(models: string[]) {
 }
 
 export function buildApiUrl(baseUrl: string, path: string) {
-    const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+    const normalizedBaseUrl = resolveApiBaseUrl(baseUrl);
     const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
-
-    // 开发环境下，将 api.panlai.me 的请求通过 Vite 代理转发，避免 CORS 问题
-    if (import.meta.env.DEV && lowerBaseUrl === "https://api.panlai.me") {
-        return `/api${path}`;
-    }
-
     const apiBaseUrl = lowerBaseUrl.endsWith("/v1") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1`;
     return `${apiBaseUrl}${path}`;
+}
+
+export function resolveApiBaseUrl(baseUrl: string) {
+    const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+    if (!PANLAI_API_PROXY_PATH) return normalizedBaseUrl;
+    const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
+    if (lowerBaseUrl !== PANLAI_API_ORIGIN && !lowerBaseUrl.startsWith(`${PANLAI_API_ORIGIN}/`)) return normalizedBaseUrl;
+    return `${PANLAI_API_PROXY_PATH}${normalizedBaseUrl.slice(PANLAI_API_ORIGIN.length)}`;
 }

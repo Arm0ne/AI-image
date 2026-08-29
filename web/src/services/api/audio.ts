@@ -135,13 +135,14 @@ function readApiErrorMessage(value: unknown): string {
 function readAxiosError(error: unknown, fallback: string) {
     if (axios.isCancel(error)) return apiText("requestCanceled");
     if (axios.isAxiosError(error)) {
-        if (!error.response && error.code === "ERR_NETWORK") return apiText("corsRequired");
+        if (!error.response && error.code === "ERR_NETWORK") return apiText("requestFailed");
         const responseData = error.response?.data;
         const apiMsg = readApiErrorMessage(responseData);
-        if (apiMsg) return apiMsg;
+        const htmlResponse = typeof responseData === "string" && /<[a-z][\s\S]*>/i.test(responseData);
+        if (apiMsg && !htmlResponse) return apiMsg;
         const statusMsg = statusMessage(error.response?.status, fallback);
         if (statusMsg) return statusMsg;
-        return error.message || fallback;
+        return apiMsg || error.message || fallback;
     }
     if (error instanceof DOMException && error.name === "AbortError") return apiText("requestCanceled");
     return error instanceof Error ? readApiErrorMessage(error.message) || error.message : fallback;

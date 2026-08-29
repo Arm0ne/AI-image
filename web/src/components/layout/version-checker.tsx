@@ -10,6 +10,8 @@ export function VersionChecker() {
     const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
+        if (import.meta.env.DEV) return;
+
         // 1. 启动时检查本地存储的版本
         if (checkVersionUpdate()) {
             // 检测到版本更新，直接强制刷新（静默）

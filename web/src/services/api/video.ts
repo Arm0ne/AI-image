@@ -239,9 +239,11 @@ function readApiErrorMessage(value: unknown): string {
 function readAxiosError(error: unknown, fallback: string) {
     if (axios.isCancel(error)) return apiText("requestCanceled");
     if (axios.isAxiosError<{ error?: { message?: string }; msg?: string; message?: string; code?: number | string }>(error)) {
-        if (!error.response && error.code === "ERR_NETWORK") return apiText("corsRequired");
+        if (!error.response && error.code === "ERR_NETWORK") return apiText("requestFailed");
         const responseData = error.response?.data;
-        return readApiErrorMessage(responseData) || statusMessage(error.response?.status, fallback);
+        const apiMsg = readApiErrorMessage(responseData);
+        const htmlResponse = typeof responseData === "string" && /<[a-z][\s\S]*>/i.test(responseData);
+        return (apiMsg && !htmlResponse ? apiMsg : "") || statusMessage(error.response?.status, fallback);
     }
     if (error instanceof DOMException && error.name === "AbortError") return apiText("requestCanceled");
     return error instanceof Error ? readApiErrorMessage(error.message) || error.message : fallback;
@@ -250,6 +252,8 @@ function readAxiosError(error: unknown, fallback: string) {
 function statusMessage(status: number | undefined, fallback: string) {
     if (status === 401 || status === 403) return apiText("authenticationFailed");
     if (status === 429) return apiText("rateLimited");
+    if (status === 502) return apiText("badGateway");
+    if (status === 503) return apiText("serviceBusy");
     return status ? `${fallback}（${status}）` : fallback;
 }
 

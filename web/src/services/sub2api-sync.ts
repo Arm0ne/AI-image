@@ -1,6 +1,6 @@
 import axios from "axios";
 import type { AiConfig, ApiCallFormat, ModelChannel } from "@/stores/use-config-store";
-import { createModelChannel, normalizeChannelModels } from "@/stores/use-config-store";
+import { createModelChannel, normalizeChannelModels, resolveApiBaseUrl } from "@/stores/use-config-store";
 
 export type Sub2ApiLoginRequest = {
     email: string;
@@ -80,10 +80,7 @@ export type Sub2ApiModelsResponse = {
  * 登录 Sub2API
  */
 export async function loginSub2Api(request: Sub2ApiLoginRequest): Promise<{ accessToken: string; userInfo: Sub2ApiUserInfo }> {
-    // 开发环境使用代理，生产环境直接访问
-    const baseUrl = import.meta.env.DEV && request.sub2apiUrl === "https://api.panlai.me"
-        ? ""
-        : request.sub2apiUrl.replace(/\/+$/, "");
+    const baseUrl = resolveApiBaseUrl(request.sub2apiUrl);
     const url = `${baseUrl}/api/v1/auth/login`;
     try {
         const response = await axios.post<Sub2ApiLoginResponse>(url, {
@@ -115,10 +112,7 @@ export async function loginSub2Api(request: Sub2ApiLoginRequest): Promise<{ acce
  * 获取用户信息（包括余额）
  */
 export async function fetchUserInfo(sub2apiUrl: string, accessToken: string): Promise<Sub2ApiUserInfo> {
-    // 开发环境使用代理，生产环境直接访问
-    const baseUrl = import.meta.env.DEV && sub2apiUrl === "https://api.panlai.me"
-        ? ""
-        : sub2apiUrl.replace(/\/+$/, "");
+    const baseUrl = resolveApiBaseUrl(sub2apiUrl);
     const url = `${baseUrl}/api/v1/auth/me`;
     try {
         const response = await axios.get<{ code: number; message: string; data: Sub2ApiUserInfo }>(url, {
@@ -148,10 +142,7 @@ export async function fetchUserInfo(sub2apiUrl: string, accessToken: string): Pr
  * 获取用户的 API Keys
  */
 export async function fetchSub2ApiKeys(sub2apiUrl: string, accessToken: string): Promise<Sub2ApiKey[]> {
-    // 开发环境使用代理，生产环境直接访问
-    const baseUrl = import.meta.env.DEV && sub2apiUrl === "https://api.panlai.me"
-        ? ""
-        : sub2apiUrl.replace(/\/+$/, "");
+    const baseUrl = resolveApiBaseUrl(sub2apiUrl);
     const url = `${baseUrl}/api/v1/keys`;
     try {
         const response = await axios.get<Sub2ApiKeysResponse>(url, {
@@ -212,10 +203,7 @@ export function mapPlatformToApiFormat(platform: string): ApiCallFormat {
  * 从 Sub2API 拉取指定 API Key 的模型列表
  */
 export async function fetchModelsFromSub2Api(sub2apiUrl: string, apiKey: string): Promise<{ models: string[]; balance?: number }> {
-    // 开发环境使用代理，生产环境直接访问
-    const baseUrl = import.meta.env.DEV && sub2apiUrl === "https://api.panlai.me"
-        ? ""
-        : sub2apiUrl.replace(/\/+$/, "");
+    const baseUrl = resolveApiBaseUrl(sub2apiUrl);
     const url = `${baseUrl}/v1/models`;
     try {
         const response = await axios.get<Sub2ApiModelsResponse>(url, {

@@ -8,6 +8,7 @@
 type RuntimeConfig = {
     ANALYTICS_GA4_ID?: string; // GA4 measurement ID (G-XXXX)
     ANALYTICS_BAIDU_ID?: string; // Baidu Analytics site ID
+    PANLAI_API_PROXY_PATH?: string; // Same-origin proxy path provided by the Docker nginx image
 };
 
 declare global {
@@ -27,3 +28,4 @@ function read(key: keyof RuntimeConfig, buildTime: string | undefined, fallback 
 
 export const ANALYTICS_GA4_ID = read("ANALYTICS_GA4_ID", import.meta.env.VITE_ANALYTICS_GA4_ID);
 export const ANALYTICS_BAIDU_ID = read("ANALYTICS_BAIDU_ID", import.meta.env.VITE_ANALYTICS_BAIDU_ID);
+export const PANLAI_API_PROXY_PATH = read("PANLAI_API_PROXY_PATH", import.meta.env.VITE_PANLAI_API_PROXY_PATH, import.meta.env.DEV ? "/panlai-api" : "").replace(/\/+$/, "");

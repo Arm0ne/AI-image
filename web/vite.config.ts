@@ -69,20 +69,11 @@ export default defineConfig({
     },
     server: {
         proxy: {
-            "/api": {
+            "/panlai-api": {
                 target: "https://api.panlai.me",
                 changeOrigin: true,
                 secure: false,
-            },
-            "/v1": {
-                target: "https://api.panlai.me",
-                changeOrigin: true,
-                secure: false,
-            },
-            "/v1beta": {
-                target: "https://api.panlai.me",
-                changeOrigin: true,
-                secure: false,
+                rewrite: (path) => path.replace(/^\/panlai-api/, ""),
             },
         },
     },
