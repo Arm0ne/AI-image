@@ -10,6 +10,7 @@ import { ModelPicker } from "@/components/model-picker";
 import { AssetPickerModal, type InsertAssetPayload } from "@/components/canvas/asset-picker-modal";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
+import { registerAiRequest } from "@/lib/ai-request-registry";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
@@ -258,8 +259,10 @@ export default function ImagePage() {
 
         const batchStartedAt = performance.now();
         setStartedAt(batchStartedAt);
+        const controller = new AbortController();
+        const unregister = registerAiRequest(controller);
 
-        const tasks = Array.from({ length: generationCount }, (_, index) => runGenerationSlot(index, snapshot));
+        const tasks = Array.from({ length: generationCount }, (_, index) => runGenerationSlot(index, snapshot, controller.signal));
 
         // 使用后台 Promise 确保即使组件卸载也能继续执行
         Promise.allSettled(tasks).then(async (result) => {
@@ -268,90 +271,93 @@ export default function ImagePage() {
             const failCount = generationCount - successCount;
             const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
             const error = failed?.reason instanceof Error ? failed.reason.message : failCount ? t("workbench.generationFailed") : undefined;
-            if (agentTaskId) updateAgentTask(agentTaskId, { status: successCount ? "succeeded" : "failed", successCount, failCount, error: successCount ? undefined : error });
+            const canceled = controller.signal.aborted;
+            if (agentTaskId) updateAgentTask(agentTaskId, { status: !canceled && successCount ? "succeeded" : "failed", successCount, failCount, error: canceled ? t("common.requestCanceled") : successCount ? undefined : error });
 
-            try {
-                // 更新每张图片的状态到 store（包括失败的）
-                result.forEach((item, index) => {
-                    if (item.status === "fulfilled") {
-                        updateTaskImage(createdTaskId, initialResults[index].id, {
-                            dataUrl: item.value.dataUrl,
+            // 更新每张图片的状态到 store（包括失败的）
+            result.forEach((item, index) => {
+                if (item.status === "fulfilled") {
+                    updateTaskImage(createdTaskId, initialResults[index].id, {
+                        dataUrl: item.value.dataUrl,
+                        status: "success",
+                    });
+                } else {
+                    updateTaskImage(createdTaskId, initialResults[index].id, {
+                        status: "failed",
+                        error: item.reason instanceof Error ? item.reason.message : String(item.reason),
+                    });
+                }
+            });
+
+            if (controller.signal.aborted) return;
+
+            const logImages = await Promise.all(
+                successImages.map(async (image) => {
+                    const stored = await uploadImage(image.dataUrl);
+                    return { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
+                }),
+            );
+            if (controller.signal.aborted) return;
+
+            // 上传完成后，更新 store 中的图片 URL 和 storageKey
+            logImages.forEach((image) => {
+                const resultIndex = successImages.findIndex(img => img.id === image.id);
+                if (resultIndex !== -1) {
+                    const originalIndex = result.findIndex((item, idx) => item.status === "fulfilled" && result.slice(0, idx + 1).filter(r => r.status === "fulfilled").length === resultIndex + 1);
+                    if (originalIndex !== -1) {
+                        updateTaskImage(createdTaskId, initialResults[originalIndex].id, {
+                            dataUrl: image.dataUrl,
+                            storageKey: image.storageKey,
                             status: "success",
                         });
-                    } else {
-                        updateTaskImage(createdTaskId, initialResults[index].id, {
-                            status: "failed",
-                            error: item.reason instanceof Error ? item.reason.message : String(item.reason),
-                        });
                     }
+                }
+            });
+
+            // 保存到历史记录
+            saveLog(
+                buildLog({
+                    prompt: text,
+                    model,
+                    config: { ...snapshot.config, count: String(generationCount) },
+                    references: snapshot.references,
+                    durationMs: performance.now() - batchStartedAt,
+                    successCount,
+                    failCount,
+                    status: successCount ? "success" : "failed",
+                    images: logImages,
+                }),
+            );
+
+            // 自动保存到资产库
+            logImages.forEach((image) => {
+                addAsset({
+                    id: nanoid(),
+                    name: `${text.slice(0, 30)}${text.length > 30 ? "..." : ""}`,
+                    url: image.dataUrl,
+                    storageKey: image.storageKey,
+                    type: "image",
+                    width: image.width,
+                    height: image.height,
+                    bytes: image.bytes,
+                    mimeType: image.mimeType,
+                    createdAt: Date.now(),
                 });
+            });
 
-                const logImages = await Promise.all(
-                    successImages.map(async (image) => {
-                        const stored = await uploadImage(image.dataUrl);
-                        return { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
-                    }),
-                );
+            // 不需要手动更新任务状态，updateTaskImage 已经自动处理了
 
-                // 上传完成后，更新 store 中的图片 URL 和 storageKey
-                logImages.forEach((image) => {
-                    const resultIndex = successImages.findIndex(img => img.id === image.id);
-                    if (resultIndex !== -1) {
-                        const originalIndex = result.findIndex((item, idx) => item.status === "fulfilled" && result.slice(0, idx + 1).filter(r => r.status === "fulfilled").length === resultIndex + 1);
-                        if (originalIndex !== -1) {
-                            updateTaskImage(createdTaskId, initialResults[originalIndex].id, {
-                                dataUrl: image.dataUrl,
-                                storageKey: image.storageKey,
-                                status: "success",
-                            });
-                        }
-                    }
-                });
-
-                // 保存到历史记录
-                saveLog(
-                    buildLog({
-                        prompt: text,
-                        model,
-                        config: { ...snapshot.config, count: String(generationCount) },
-                        references: snapshot.references,
-                        durationMs: performance.now() - batchStartedAt,
-                        successCount,
-                        failCount,
-                        status: successCount ? "success" : "failed",
-                        images: logImages,
-                    }),
-                );
-
-                // 自动保存到资产库
-                logImages.forEach((image) => {
-                    addAsset({
-                        id: nanoid(),
-                        name: `${text.slice(0, 30)}${text.length > 30 ? "..." : ""}`,
-                        url: image.dataUrl,
-                        storageKey: image.storageKey,
-                        type: "image",
-                        width: image.width,
-                        height: image.height,
-                        bytes: image.bytes,
-                        mimeType: image.mimeType,
-                        createdAt: Date.now(),
-                    });
-                });
-
-                // 不需要手动更新任务状态，updateTaskImage 已经自动处理了
-
-                successCount ? message.success(t("imageWorkbench.generated")) : message.error(failed?.reason instanceof Error ? failed.reason.message : t("workbench.generationFailed"));
-            } finally {
-                setRunning(false);
-                currentTaskIdRef.current = undefined;
-            }
+            successCount ? message.success(t("imageWorkbench.generated")) : message.error(failed?.reason instanceof Error ? failed.reason.message : t("workbench.generationFailed"));
         }).catch((error) => {
             console.error("Generation error:", error);
             // updateTaskImage 已经自动处理了失败状态
             setRunning(false);
             currentTaskIdRef.current = undefined;
             message.error(error instanceof Error ? error.message : t("workbench.generationFailed"));
+        }).finally(() => {
+            unregister();
+            setRunning(false);
+            currentTaskIdRef.current = undefined;
         });
     };
 
@@ -468,10 +474,10 @@ export default function ImagePage() {
         return { text, config: { ...effectiveConfig, model, count: "1" }, references: [...references] };
     };
 
-    const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }) => {
+    const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }, signal?: AbortSignal) => {
         const itemStartedAt = performance.now();
         try {
-            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references) : await requestGeneration(snapshot.config, snapshot.text);
+            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references, undefined, { signal }) : await requestGeneration(snapshot.config, snapshot.text, { signal });
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
             const meta = await readImageMeta(image.dataUrl);
@@ -490,9 +496,13 @@ export default function ImagePage() {
         setPreviewLog(null);
         setResults((value) => updateResultAt(value, index, { status: "pending", error: undefined, image: undefined }));
         const retryStartedAt = performance.now();
+        const controller = new AbortController();
+        const unregister = registerAiRequest(controller);
         try {
-            const image = await runGenerationSlot(index, snapshot);
+            const image = await runGenerationSlot(index, snapshot, controller.signal);
+            if (controller.signal.aborted) return;
             const stored = await uploadImage(image.dataUrl);
+            if (controller.signal.aborted) return;
             const logImage = { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
             setResults((value) => updateResultAt(value, index, { image: { ...image, dataUrl: stored.url, storageKey: stored.storageKey } }));
             saveLog(
@@ -511,6 +521,8 @@ export default function ImagePage() {
             message.success(t("workbench.retrySuccess"));
         } catch {
             // runGenerationSlot has already marked the result as failed.
+        } finally {
+            unregister();
         }
     };
 

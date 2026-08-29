@@ -12,6 +12,7 @@ import { useUserStore } from "@/stores/use-user-store";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { useAgentStore } from "@/stores/use-agent-store";
+import { useConfigStore } from "@/stores/use-config-store";
 
 export function AppTopNav() {
     const { t } = useTranslation();
@@ -33,8 +34,10 @@ export function AppTopNav() {
     const userInfo = useUserStore((state) => state.userInfo);
     const isLoggedIn = useUserStore((state) => state.isLoggedIn);
     const clearUserInfo = useUserStore((state) => state.clearUserInfo);
+    const clearAiCredentials = useConfigStore((state) => state.clearAiCredentials);
 
     const handleLogout = () => {
+        clearAiCredentials();
         clearUserInfo();
     };
 

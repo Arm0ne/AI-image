@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
 import { PANLAI_API_PROXY_PATH } from "@/constant/runtime-config";
+import { cancelAiRequests } from "@/lib/ai-request-registry";
 
 export type ApiCallFormat = "openai" | "gemini" | "grok" | "seedance";
 export type ModelCapability = "image" | "video" | "text" | "audio";
@@ -117,6 +118,7 @@ type ConfigStore = {
     configTab: ConfigTabKey;
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
+    clearAiCredentials: () => void;
     updateWebdavConfig: <K extends keyof WebdavSyncConfig>(key: K, value: WebdavSyncConfig[K]) => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean, tab?: ConfigTabKey) => void;
@@ -196,6 +198,24 @@ export const useConfigStore = create<ConfigStore>()(
                         [key]: value,
                     },
                 })),
+            clearAiCredentials: () => {
+                cancelAiRequests();
+                set((state) => ({
+                    config: {
+                        ...state.config,
+                        baseUrl: defaultConfig.baseUrl,
+                        apiKey: "",
+                        apiFormat: defaultConfig.apiFormat,
+                        channels: [],
+                        models: [],
+                        model: "",
+                        imageModel: "",
+                        videoModel: "",
+                        textModel: "",
+                        audioModel: "",
+                    },
+                }));
+            },
             updateWebdavConfig: (key, value) =>
                 set((state) => ({
                     webdav: {
