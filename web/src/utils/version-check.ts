@@ -10,7 +10,7 @@ const CHECK_INTERVAL = 30 * 60 * 1000; // 30分钟检查一次
  * 获取当前应用版本号（从构建时注入）
  */
 export function getCurrentVersion(): string {
-    return import.meta.env.VITE_APP_VERSION || "0.1.0";
+    return __APP_VERSION__;
 }
 
 /**
