@@ -322,6 +322,15 @@ export function modelOptionsFromChannels(channels: ModelChannel[]) {
     return uniqueModelOptions(channels.flatMap((channel) => channel.models.map((model) => encodeChannelModel(channel.id, model.name))));
 }
 
+export function preferredImageModelFromChannels(channels: ModelChannel[]) {
+    const imageModels = channels.flatMap((channel) =>
+        channel.models
+            .filter((model) => model.capability === "image")
+            .map((model) => ({ value: encodeChannelModel(channel.id, model.name), normalizedName: model.name.toLowerCase().replace(/[^a-z0-9]/g, "") })),
+    );
+    return imageModels.find((model) => model.normalizedName.includes("image2"))?.value || imageModels[0]?.value || "";
+}
+
 export function normalizeModelOptionValue(value: string | undefined, channels: ModelChannel[]) {
     const model = (value || "").trim();
     if (!model) return "";

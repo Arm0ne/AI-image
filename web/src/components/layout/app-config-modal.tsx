@@ -13,7 +13,7 @@ import { exportAppConfig, importAppConfig } from "@/services/config-file";
 import { syncAppDataToWebdav, type AppSyncDomainKey, type AppSyncProgressEvent } from "@/services/app-sync";
 import { testWebdavConnection, WEBDAV_MANIFEST_FILE_NAME } from "@/services/webdav-sync";
 import { audioFormatOptions, audioVoiceOptions, normalizeAudioSpeedValue } from "@/lib/audio-generation";
-import { createModelChannel, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
+import { createModelChannel, modelOptionsFromChannels, normalizeModelOptionValue, preferredImageModelFromChannels, selectableModelsByCapability, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { syncChannelsFromSub2Api, syncChannelsWithToken } from "@/services/sub2api-sync";
 
@@ -136,6 +136,11 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
             // 完全替换现有渠道配置
             updateConfig("channels", channels);
             updateConfig("models", modelOptionsFromChannels(channels));
+            const preferredImageModel = preferredImageModelFromChannels(channels);
+            if (preferredImageModel) {
+                updateConfig("imageModel", preferredImageModel);
+                updateConfig("model", preferredImageModel);
+            }
 
             message.success(`成功同步 ${channels.length} 个生图组渠道`);
         } catch (error) {

@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Modal, Form, Input, Button, message, Alert } from "antd";
 import { useTranslation } from "react-i18next";
 import { syncChannelsFromSub2Api } from "@/services/sub2api-sync";
-import { useConfigStore } from "@/stores/use-config-store";
-import { modelOptionsFromChannels } from "@/stores/use-config-store";
+import { modelOptionsFromChannels, preferredImageModelFromChannels, useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 type Sub2ApiLoginModalProps = {
@@ -21,7 +20,7 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
     const { t } = useTranslation();
     const [form] = Form.useForm<FormValues>();
     const [loading, setLoading] = useState(false);
-    const { config, updateConfig } = useConfigStore();
+    const updateConfig = useConfigStore((state) => state.updateConfig);
     const setUserInfo = useUserStore((state) => state.setUserInfo);
     const setAccessToken = useUserStore((state) => state.setAccessToken);
 
@@ -43,11 +42,11 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
             updateConfig("channels", channels);
             updateConfig("models", modelOptionsFromChannels(channels));
 
-            // 如果当前没有选中图片模型，自动选择第一个生图组的第一个模型
-            if (!config.imageModel && channels.length > 0 && channels[0].models.length > 0) {
-                const firstModel = `${channels[0].id}::${channels[0].models[0].name}`;
-                updateConfig("imageModel", firstModel);
-                updateConfig("model", firstModel);
+            // 登录同步后优先使用 Image2；没有 Image2 时才回退到第一个图片模型。
+            const preferredImageModel = preferredImageModelFromChannels(channels);
+            if (preferredImageModel) {
+                updateConfig("imageModel", preferredImageModel);
+                updateConfig("model", preferredImageModel);
             }
 
             message.success(`成功同步 ${channels.length} 个生图组渠道`);
