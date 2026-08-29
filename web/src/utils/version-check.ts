@@ -1,113 +1,54 @@
-/**
- * 版本检测工具
- * 用于检测应用版本更新并提示用户刷新
- */
+import { APP_BUILD_ID } from "@/constant/env";
 
-const VERSION_KEY = "infinite-canvas:app_version";
-const CHECK_INTERVAL = 30 * 60 * 1000; // 30分钟检查一次
+const CHECK_INTERVAL = 5 * 60 * 1000;
+const INITIAL_CHECK_DELAY = 5000;
 
-/**
- * 获取当前应用版本号（从构建时注入）
- */
-export function getCurrentVersion(): string {
-    return __APP_VERSION__;
-}
+type VersionManifest = {
+    buildId?: unknown;
+};
 
-/**
- * 获取本地存储的版本号
- */
-export function getStoredVersion(): string | null {
-    return localStorage.getItem(VERSION_KEY);
-}
-
-/**
- * 保存版本号到本地存储
- */
-export function saveVersion(version: string): void {
-    localStorage.setItem(VERSION_KEY, version);
-}
-
-/**
- * 检查版本是否需要更新
- * 如果检测到版本不一致，返回 true
- */
-export function checkVersionUpdate(): boolean {
-    const currentVersion = getCurrentVersion();
-    const storedVersion = getStoredVersion();
-
-    // 第一次访问，保存当前版本
-    if (!storedVersion) {
-        saveVersion(currentVersion);
-        return false;
-    }
-
-    // 版本不一致，需要更新
-    if (storedVersion !== currentVersion) {
-        console.log(`检测到版本更新: ${storedVersion} -> ${currentVersion}`);
-        return true;
-    }
-
-    return false;
-}
-
-/**
- * 强制刷新页面并清除缓存
- */
 export function forceReload(): void {
-    const currentVersion = getCurrentVersion();
-    saveVersion(currentVersion);
-
-    // 清除所有缓存
-    if ('caches' in window) {
-        caches.keys().then((names) => {
-            names.forEach((name) => caches.delete(name));
-        });
-    }
-
-    // 强制刷新页面（绕过缓存）
     window.location.reload();
 }
 
-/**
- * 启动定期版本检查
- * 通过请求一个版本文件来检测服务器版本
- */
 export function startVersionCheck(onUpdateDetected: () => void): () => void {
-    let intervalId: number | null = null;
+    let checking = false;
+    let stopped = false;
+    let detectedBuildId = "";
 
     const check = async () => {
+        if (checking || stopped) return;
+        checking = true;
+
         try {
-            // 请求版本文件，添加时间戳避免缓存
-            const response = await fetch(`/version.json?t=${Date.now()}`, {
-                cache: 'no-cache',
-            });
+            const response = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" });
+            if (!response.ok) return;
 
-            if (response.ok) {
-                const data = await response.json();
-                const serverVersion = data.version;
-                const currentVersion = getCurrentVersion();
-
-                if (serverVersion && serverVersion !== currentVersion) {
-                    console.log(`检测到服务器版本更新: ${currentVersion} -> ${serverVersion}`);
-                    onUpdateDetected();
-                }
+            const data = (await response.json()) as VersionManifest;
+            const serverBuildId = typeof data.buildId === "string" ? data.buildId.trim() : "";
+            if (serverBuildId && serverBuildId !== APP_BUILD_ID && serverBuildId !== detectedBuildId) {
+                detectedBuildId = serverBuildId;
+                onUpdateDetected();
             }
         } catch (error) {
-            // 静默失败，不影响用户体验
             console.warn("版本检查失败:", error);
+        } finally {
+            checking = false;
         }
     };
 
-    // 延迟5秒后首次检查（避免影响首屏加载和测试）
-    setTimeout(check, 5000);
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") void check();
+    };
 
-    // 定期检查
-    intervalId = window.setInterval(check, CHECK_INTERVAL);
+    const timeoutId = window.setTimeout(() => void check(), INITIAL_CHECK_DELAY);
+    const intervalId = window.setInterval(() => void check(), CHECK_INTERVAL);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 返回清理函数
     return () => {
-        if (intervalId !== null) {
-            clearInterval(intervalId);
-        }
+        stopped = true;
+        window.clearTimeout(timeoutId);
+        window.clearInterval(intervalId);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
 }
