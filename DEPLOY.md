@@ -126,16 +126,9 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
-        proxy_connect_timeout 15s;
-        proxy_send_timeout 650s;
-        proxy_read_timeout 650s;
-        proxy_buffering off;
-        client_max_body_size 100m;
     }
 }
 ```
-
-生图请求可能持续数分钟。宿主机反向代理的读写超时必须高于容器内 `/panlai-api/` 的 600 秒超时，否则超过默认 60 秒的请求会被宿主机提前中断。
 
 ### 3. 启用配置
 
