@@ -98,8 +98,8 @@ export function startVersionCheck(onUpdateDetected: () => void): () => void {
         }
     };
 
-    // 立即检查一次
-    check();
+    // 延迟5秒后首次检查（避免影响首屏加载和测试）
+    setTimeout(check, 5000);
 
     // 定期检查
     intervalId = window.setInterval(check, CHECK_INTERVAL);

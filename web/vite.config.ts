@@ -50,6 +50,23 @@ export default defineConfig({
         __APP_VERSION__: JSON.stringify(localVersion),
         __APP_RELEASES__: JSON.stringify(parseChangelog(localChangelog)),
     },
+    build: {
+        rollupOptions: {
+            plugins: [
+                {
+                    name: "generate-version-json",
+                    generateBundle() {
+                        // 在构建时生成 version.json 文件
+                        this.emitFile({
+                            type: "asset",
+                            fileName: "version.json",
+                            source: JSON.stringify({ version: localVersion }),
+                        });
+                    },
+                },
+            ],
+        },
+    },
     server: {
         proxy: {
             "/api": {

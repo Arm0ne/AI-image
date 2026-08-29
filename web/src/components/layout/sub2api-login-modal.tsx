@@ -70,7 +70,13 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
             width={500}
         >
             <Alert
-                message={t("config.channels.loginPrompt")}
+                message={
+                    <>
+                        登录后将自动拉取您的生图组 API 密钥并配置到工作台
+                        <br />
+                        (请务必先在Alien API站点创建API密钥并选择正确的生图分组)
+                    </>
+                }
                 type="info"
                 showIcon
                 style={{ marginBottom: 16, padding: '8px 12px' }}

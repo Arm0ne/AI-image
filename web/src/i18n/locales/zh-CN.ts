@@ -351,6 +351,12 @@ export default {
         updateFailed: "获取最新版本信息失败",
         types: { added: "新增", fixed: "修复", changed: "调整", optimized: "优化", docs: "文档" },
     },
+    versionChecker: {
+        title: "发现新版本",
+        description: "检测到新版本已发布，建议立即刷新页面以获得最佳体验和最新功能。",
+        refresh: "立即刷新",
+        later: "稍后再说",
+    },
     config: {
         title: "配置与用户偏好",
         invalidFile: "配置文件格式不正确",
@@ -397,7 +403,7 @@ export default {
             newName: "新渠道",
             indexedName: "渠道 {{index}}",
             syncFromAlienApi: "从 Alien API 同步",
-            loginPrompt: "登录后将自动拉取您的生图组 API 密钥并配置到本地渠道。（请务必先在Alien API站点创建API密钥并选择正确的生图分组）",
+            loginPrompt: "登录后将自动拉取您的生图组 API 密钥并配置到工作台\n（请务必先在Alien API站点创建API密钥并选择正确的生图分组）",
             loginTitle: "登录您的 Alien API 账号",
             email: "邮箱",
             password: "密码",

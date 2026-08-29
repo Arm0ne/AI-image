@@ -351,6 +351,12 @@ export default {
         updateFailed: "Failed to load the latest version information",
         types: { added: "Added", fixed: "Fixed", changed: "Changed", optimized: "Optimized", docs: "Docs" },
     },
+    versionChecker: {
+        title: "New Version Available",
+        description: "A new version has been released. Please refresh the page to get the best experience and latest features.",
+        refresh: "Refresh Now",
+        later: "Later",
+    },
     config: {
         title: "Settings & Preferences",
         invalidFile: "The settings file format is invalid",
