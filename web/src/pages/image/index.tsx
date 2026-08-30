@@ -20,7 +20,7 @@ import { requestEdit, requestGeneration } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
-import { useGenerationStore } from "@/stores/use-generation-store";
+import { useGenerationStore, type GenerationTask } from "@/stores/use-generation-store";
 import type { ReferenceImage } from "@/types/image";
 import i18n from "@/i18n";
 
@@ -67,6 +67,7 @@ type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "
 type UpdateAiConfig = <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
 
 const LOG_STORE_KEY = "infinite-canvas:image_generation_logs";
+const LOGS_UPDATED_EVENT = "infinite-canvas:image-generation-logs-updated";
 const RESULT_ACTION_BUTTON_CLASS = "min-w-0 px-1.5 [&_.ant-btn-icon]:shrink-0 [&>span:last-child]:min-w-0 [&>span:last-child]:truncate";
 const logStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_generation_logs" });
 
@@ -113,6 +114,21 @@ export default function ImagePage() {
     const canGenerate = Boolean(prompt.trim());
     const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
 
+    const previewGenerationTask = (task: GenerationTask) => {
+        currentTaskIdRef.current = task.id;
+        setPreviewLog(null);
+        setPrompt(task.prompt);
+        setReferences(task.references || []);
+        if (task.model) updateConfig("imageModel", task.model);
+        if (task.settings?.quality) updateConfig("quality", task.settings.quality);
+        if (task.settings?.size) updateConfig("size", task.settings.size);
+        setRunning(task.status === "pending" || task.status === "running");
+        const elapsed = Math.max(0, Date.now() - task.createdAt);
+        setElapsedMs(elapsed);
+        setStartedAt(performance.now() - elapsed);
+        setResults(generationTaskToResults(task));
+    };
+
     useEffect(() => {
         if (!running || !startedAt) return;
         const timer = window.setInterval(() => setElapsedMs(performance.now() - startedAt), 1000);
@@ -124,29 +140,15 @@ export default function ImagePage() {
 
         // 检查是否有活动任务，如果有则恢复 UI 状态
         const activeTask = getActiveTask();
-        if (activeTask) {
-            currentTaskIdRef.current = activeTask.id;
-            setRunning(true);
-            setPrompt(activeTask.prompt);
-            setStartedAt(activeTask.createdAt);
+        if (activeTask) previewGenerationTask(activeTask);
+    }, []);
 
-            // 从任务恢复结果状态
-            const taskResults: GenerationResult[] = activeTask.images.map((img) => ({
-                id: img.id,
-                status: img.status === "pending" ? "pending" : img.status === "success" ? "success" : "failed",
-                image: img.status === "success" && img.dataUrl ? {
-                    id: img.id,
-                    dataUrl: img.dataUrl,
-                    storageKey: img.storageKey,
-                    durationMs: 0,
-                    width: 0,
-                    height: 0,
-                    bytes: 0,
-                } : undefined,
-                error: img.error,
-            }));
-            setResults(taskResults);
-        }
+    useEffect(() => {
+        const handleLogsUpdated = () => {
+            void refreshLogs();
+        };
+        window.addEventListener(LOGS_UPDATED_EVENT, handleLogsUpdated);
+        return () => window.removeEventListener(LOGS_UPDATED_EVENT, handleLogsUpdated);
     }, []);
 
     // 监听当前任务的变化，实时同步到 results 状态
@@ -158,21 +160,7 @@ export default function ImagePage() {
         if (!currentTask) return;
 
         // 同步任务的图片状态到 results
-        const taskResults: GenerationResult[] = currentTask.images.map((img) => ({
-            id: img.id,
-            status: img.status === "pending" ? "pending" : img.status === "success" ? "success" : "failed",
-            image: img.status === "success" && img.dataUrl ? {
-                id: img.id,
-                dataUrl: img.dataUrl,
-                storageKey: img.storageKey,
-                durationMs: 0,
-                width: 0,
-                height: 0,
-                bytes: 0,
-            } : undefined,
-            error: img.error,
-        }));
-        setResults(taskResults);
+        setResults(generationTaskToResults(currentTask));
 
         // 如果任务已完成或失败，更新 running 状态和清除任务引用
         if (currentTask.status === "success" || currentTask.status === "failed") {
@@ -250,6 +238,8 @@ export default function ImagePage() {
             prompt: text,
             model,
             count: generationCount,
+            references: snapshot.references,
+            settings: { quality: snapshot.config.quality, size: snapshot.config.size },
             status: "running",
             images: initialResults,
         });
@@ -280,6 +270,11 @@ export default function ImagePage() {
                     updateTaskImage(createdTaskId, initialResults[index].id, {
                         dataUrl: item.value.dataUrl,
                         status: "success",
+                        width: item.value.width,
+                        height: item.value.height,
+                        bytes: item.value.bytes,
+                        mimeType: item.value.mimeType,
+                        durationMs: item.value.durationMs,
                     });
                 } else {
                     updateTaskImage(createdTaskId, initialResults[index].id, {
@@ -309,13 +304,18 @@ export default function ImagePage() {
                             dataUrl: image.dataUrl,
                             storageKey: image.storageKey,
                             status: "success",
+                            width: image.width,
+                            height: image.height,
+                            bytes: image.bytes,
+                            mimeType: image.mimeType,
+                            durationMs: image.durationMs,
                         });
                     }
                 }
             });
 
             // 保存到历史记录
-            saveLog(
+            await saveLog(
                 buildLog({
                     prompt: text,
                     model,
@@ -426,13 +426,21 @@ export default function ImagePage() {
         setDeleteConfirmOpen(false);
     };
 
-    const saveLog = (log: GenerationLog) => {
-        void logStore.setItem(log.id, serializeLog(log)).then(refreshLogs);
+    const saveLog = async (log: GenerationLog) => {
+        try {
+            await logStore.setItem(log.id, serializeLog(log));
+            window.dispatchEvent(new Event(LOGS_UPDATED_EVENT));
+            await refreshLogs();
+        } catch (error) {
+            // A history write failure must not turn a successful generation into a failed one.
+            console.error("Failed to save generation log:", error);
+        }
     };
 
     const refreshLogs = async () => setLogs(await readStoredLogs());
 
     const previewGenerationLog = async (log: GenerationLog) => {
+        currentTaskIdRef.current = undefined;
         setPreviewLog(log);
         setLogsOpen(false);
         setPrompt(log.prompt);
@@ -465,7 +473,7 @@ export default function ImagePage() {
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
             const meta = await readImageMeta(image.dataUrl);
-            const nextImage = { id: image.id, dataUrl: image.dataUrl, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: getDataUrlByteSize(image.dataUrl) };
+            const nextImage: GeneratedImage = { id: image.id, dataUrl: image.dataUrl, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: getDataUrlByteSize(image.dataUrl), mimeType: meta.mimeType };
             setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
             return nextImage;
         } catch (error) {
@@ -489,7 +497,7 @@ export default function ImagePage() {
             if (controller.signal.aborted) return;
             const logImage = { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
             setResults((value) => updateResultAt(value, index, { image: { ...image, dataUrl: stored.url, storageKey: stored.storageKey } }));
-            saveLog(
+            await saveLog(
                 buildLog({
                     prompt: snapshot.text,
                     model,
@@ -518,9 +526,11 @@ export default function ImagePage() {
                         logs={logs}
                         selectedLogIds={selectedLogIds}
                         activeLogId={previewLog?.id}
+                        activeTaskId={currentTaskIdRef.current}
                         onSelectedLogIdsChange={setSelectedLogIds}
                         onCreateSession={createSession}
                         onDeleteSelected={() => setDeleteConfirmOpen(true)}
+                        onPreviewTask={previewGenerationTask}
                         onPreviewLog={(log) => void previewGenerationLog(log)}
                     />
                 </aside>
@@ -680,9 +690,11 @@ export default function ImagePage() {
                     logs={logs}
                     selectedLogIds={selectedLogIds}
                     activeLogId={previewLog?.id}
+                    activeTaskId={currentTaskIdRef.current}
                     onSelectedLogIdsChange={setSelectedLogIds}
                     onCreateSession={createSession}
                     onDeleteSelected={() => setDeleteConfirmOpen(true)}
+                    onPreviewTask={previewGenerationTask}
                     onPreviewLog={(log) => void previewGenerationLog(log)}
                 />
             </Drawer>
@@ -801,6 +813,24 @@ function FailedImageCard({ error, onRetry }: { error: string; onRetry: () => voi
     );
 }
 
+function generationTaskToResults(task: GenerationTask): GenerationResult[] {
+    return task.images.map((image) => ({
+        id: image.id,
+        status: image.status,
+        image: image.status === "success" && image.dataUrl ? {
+            id: image.id,
+            dataUrl: image.dataUrl,
+            storageKey: image.storageKey,
+            durationMs: image.durationMs ?? 0,
+            width: image.width ?? 0,
+            height: image.height ?? 0,
+            bytes: image.bytes ?? 0,
+            mimeType: image.mimeType,
+        } : undefined,
+        error: image.error,
+    }));
+}
+
 function updateResultAt(results: GenerationResult[], index: number, next: Partial<GenerationResult>) {
     return results.map((item, itemIndex) => (itemIndex === index ? { ...item, ...next } : item));
 }
@@ -809,17 +839,21 @@ function LogPanel({
     logs,
     selectedLogIds,
     activeLogId,
+    activeTaskId,
     onSelectedLogIdsChange,
     onCreateSession,
     onDeleteSelected,
+    onPreviewTask,
     onPreviewLog,
 }: {
     logs: GenerationLog[];
     selectedLogIds: string[];
     activeLogId?: string;
+    activeTaskId?: string;
     onSelectedLogIdsChange: (ids: string[]) => void;
     onCreateSession: () => void;
     onDeleteSelected: () => void;
+    onPreviewTask: (task: GenerationTask) => void;
     onPreviewLog: (log: GenerationLog) => void;
 }) {
     const { t } = useTranslation();
@@ -851,7 +885,7 @@ function LogPanel({
             <div className="space-y-3">
                 {/* 显示正在进行的任务 */}
                 {activeTasks.map((task) => (
-                    <ActiveTaskCard key={task.id} task={task} />
+                    <ActiveTaskCard key={task.id} task={task} active={activeTaskId === task.id} onClick={() => onPreviewTask(task)} />
                 ))}
 
                 {/* 显示历史日志 */}
@@ -921,14 +955,25 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
     );
 }
 
-function ActiveTaskCard({ task }: { task: ReturnType<typeof useGenerationStore.getState>["tasks"][number] }) {
+function ActiveTaskCard({ task, active, onClick }: { task: GenerationTask; active: boolean; onClick: () => void }) {
     const { t } = useTranslation();
     const successImages = task.images.filter((img) => img.status === "success" && img.dataUrl);
     const thumbnails = successImages.slice(0, 4).map((img) => img.dataUrl);
-    const elapsedMs = Date.now() - task.createdAt;
+    const [elapsedMs, setElapsedMs] = useState(() => Math.max(0, Date.now() - task.createdAt));
+
+    useEffect(() => {
+        const updateElapsed = () => setElapsedMs(Math.max(0, Date.now() - task.createdAt));
+        updateElapsed();
+        const timer = window.setInterval(updateElapsed, 1000);
+        return () => window.clearInterval(timer);
+    }, [task.createdAt]);
 
     return (
-        <div className="block w-full rounded-lg border border-blue-500 bg-blue-50 p-2 dark:border-blue-400 dark:bg-blue-950/30">
+        <button
+            type="button"
+            className={`block w-full rounded-lg border p-2 text-left transition ${active ? "border-blue-700 bg-blue-100 dark:border-blue-300 dark:bg-blue-900/40" : "border-blue-500 bg-blue-50 hover:bg-blue-100 dark:border-blue-400 dark:bg-blue-950/30 dark:hover:bg-blue-900/40"}`}
+            onClick={onClick}
+        >
             <div className="grid grid-cols-[minmax(128px,1fr)_auto] gap-2">
                 <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2">
                     <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" />
@@ -967,7 +1012,7 @@ function ActiveTaskCard({ task }: { task: ReturnType<typeof useGenerationStore.g
                     </div>
                 </div>
             </div>
-        </div>
+        </button>
     );
 }
 

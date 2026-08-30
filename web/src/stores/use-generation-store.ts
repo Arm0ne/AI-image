@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
 
+import type { ReferenceImage } from "@/types/image";
+import type { AiConfig } from "@/stores/use-config-store";
+
 export type GenerationTaskStatus = "pending" | "running" | "completed" | "success" | "failed";
 
 export type GenerationTask = {
@@ -8,6 +11,8 @@ export type GenerationTask = {
     prompt: string;
     model: string;
     count: number;
+    references?: ReferenceImage[];
+    settings?: Pick<AiConfig, "quality" | "size">;
     status: GenerationTaskStatus;
     createdAt: number;
     completedAt?: number;
@@ -19,6 +24,11 @@ export type GenerationTask = {
         storageKey?: string;
         status: "pending" | "success" | "failed";
         error?: string;
+        width?: number;
+        height?: number;
+        bytes?: number;
+        mimeType?: string;
+        durationMs?: number;
     }>;
 };
 
@@ -26,7 +36,7 @@ type GenerationStore = {
     tasks: GenerationTask[];
     addTask: (task: Omit<GenerationTask, "id" | "createdAt" | "successCount" | "failCount">) => string;
     updateTask: (id: string, patch: Partial<Omit<GenerationTask, "id" | "createdAt">>) => void;
-    updateTaskImage: (taskId: string, imageId: string, patch: { status?: "pending" | "success" | "failed"; dataUrl?: string; storageKey?: string; error?: string }) => void;
+    updateTaskImage: (taskId: string, imageId: string, patch: { status?: "pending" | "success" | "failed"; dataUrl?: string; storageKey?: string; error?: string; width?: number; height?: number; bytes?: number; mimeType?: string; durationMs?: number }) => void;
     removeTask: (id: string) => void;
     clearCompletedTasks: () => void;
     getActiveTask: () => GenerationTask | undefined;
