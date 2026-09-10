@@ -6,8 +6,8 @@ import { useTranslation } from "react-i18next";
 
 import { useCopyText } from "@/hooks/use-copy-text";
 import { formatBytes, readFileAsDataUrl } from "@/lib/image-utils";
-import { prepareImageForDownload } from "@/lib/image-format-converter";
-import { uploadImage } from "@/services/image-storage";
+import { getMediaBlob } from "@/services/file-storage";
+import { getImageBlob, uploadImage } from "@/services/image-storage";
 import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset, type AssetKind, type ImageAsset } from "@/stores/use-asset-store";
 import { useConfigStore } from "@/stores/use-config-store";
@@ -147,12 +147,16 @@ export default function AssetsPage() {
 
     const downloadImage = async (asset: Asset) => {
         if (asset.kind !== "image" && asset.kind !== "video") return;
-        if (asset.kind === "image") {
-            const format = useConfigStore.getState().config.imageDownloadFormat;
-            const { dataUrl, extension } = await prepareImageForDownload(asset.data.dataUrl, format);
-            saveAs(dataUrl, `${asset.title || "asset"}.${extension}`);
-        } else {
-            saveAs(asset.data.url, `${asset.title || "asset"}.${asset.data.mimeType.split("/")[1] || "mp4"}`);
+        try {
+            const blob = await readAssetMediaBlob(asset);
+            if (!blob) {
+                message.error(t("assets.downloadFailed"));
+                return;
+            }
+            const ext = asset.data.mimeType?.split("/")[1]?.split("+")[0] || (asset.kind === "video" ? "mp4" : "png");
+            saveAs(blob, `${asset.title || "asset"}.${ext}`);
+        } catch {
+            message.error(t("assets.downloadFailed"));
         }
     };
 
@@ -536,6 +540,18 @@ function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | nu
             ) : null}
         </Drawer>
     );
+}
+
+async function readAssetMediaBlob(asset: Extract<Asset, { kind: "image" | "video" }>) {
+    const storageKey = asset.data.storageKey;
+    if (storageKey) {
+        const stored = asset.kind === "image" ? await getImageBlob(storageKey) : await getMediaBlob(storageKey);
+        if (stored) return stored;
+    }
+    const url = asset.kind === "video" ? asset.data.url : asset.data.dataUrl || asset.coverUrl;
+    if (!url) return null;
+    const response = await fetch(url);
+    return response.ok ? response.blob() : null;
 }
 
 function assetSummary(asset: Asset) {

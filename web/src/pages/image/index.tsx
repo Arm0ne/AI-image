@@ -14,8 +14,7 @@ import { registerAiRequest } from "@/lib/ai-request-registry";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
-import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
-import { prepareImageForDownload } from "@/lib/image-format-converter";
+import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -286,6 +285,7 @@ export default function ImagePage() {
 
             if (controller.signal.aborted) return;
 
+<<<<<<< HEAD
             const logImages = await Promise.all(
                 successImages.map(async (image) => {
                     const stored = await uploadImage(image.dataUrl);
@@ -316,6 +316,10 @@ export default function ImagePage() {
 
             // 保存到历史记录
             await saveLog(
+=======
+        try {
+            saveLog(
+>>>>>>> upstream/main
                 buildLog({
                     prompt: text,
                     model,
@@ -325,7 +329,7 @@ export default function ImagePage() {
                     successCount,
                     failCount,
                     status: successCount ? "success" : "failed",
-                    images: logImages,
+                    images: successImages,
                 }),
             );
 
@@ -472,8 +476,13 @@ export default function ImagePage() {
             const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references, undefined, { signal }) : await requestGeneration(snapshot.config, snapshot.text, { signal });
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
+<<<<<<< HEAD
             const meta = await readImageMeta(image.dataUrl);
             const nextImage: GeneratedImage = { id: image.id, dataUrl: image.dataUrl, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: getDataUrlByteSize(image.dataUrl), mimeType: meta.mimeType };
+=======
+            const stored = await uploadImage(image.dataUrl);
+            const nextImage: GeneratedImage = { id: image.id, dataUrl: stored.url, ...(stored.storageKey ? { storageKey: stored.storageKey } : {}), durationMs: performance.now() - itemStartedAt, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
+>>>>>>> upstream/main
             setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
             return nextImage;
         } catch (error) {
@@ -491,6 +500,7 @@ export default function ImagePage() {
         const controller = new AbortController();
         const unregister = registerAiRequest(controller);
         try {
+<<<<<<< HEAD
             const image = await runGenerationSlot(index, snapshot, controller.signal);
             if (controller.signal.aborted) return;
             const stored = await uploadImage(image.dataUrl);
@@ -498,6 +508,10 @@ export default function ImagePage() {
             const logImage = { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
             setResults((value) => updateResultAt(value, index, { image: { ...image, dataUrl: stored.url, storageKey: stored.storageKey } }));
             await saveLog(
+=======
+            const image = await runGenerationSlot(index, snapshot);
+            saveLog(
+>>>>>>> upstream/main
                 buildLog({
                     prompt: snapshot.text,
                     model,
@@ -507,7 +521,7 @@ export default function ImagePage() {
                     successCount: 1,
                     failCount: 0,
                     status: "success",
-                    images: [logImage],
+                    images: [image],
                 }),
             );
             message.success(t("workbench.retrySuccess"));

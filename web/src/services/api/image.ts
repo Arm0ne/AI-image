@@ -1,13 +1,14 @@
 import axios from "axios";
 
 import i18n from "@/i18n";
-import { buildApiUrl, resolveApiBaseUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, withLocalProxy, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { normalizePluginImages, runModelPlugin } from "./model-plugin";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import { requestUserInfoRefresh } from "@/services/sub2api-sync";
+import { imageSizePresets, inferMediaScale } from "@/lib/media-size";
 import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -134,6 +135,9 @@ function normalizeBackground(background: string | undefined) {
 /** Map "quality + ratio" to an explicit pixel dimension like "3840x2160". */
 function resolveSize(quality: string | undefined, ratio: string): string {
     const parsedRatio = parseImageRatio(ratio);
+    const scale = quality === "high" ? "4k" : quality === "medium" || quality === "hd" ? "2k" : "1k";
+    const preset = imageSizePresets[scale][ratio];
+    if (preset) return preset;
     const basePixels = quality ? QUALITY_BASE[quality] : undefined;
     const isLandscape = parsedRatio.width >= parsedRatio.height;
     const longRatio = isLandscape ? parsedRatio.width / parsedRatio.height : parsedRatio.height / parsedRatio.width;
@@ -204,21 +208,8 @@ function resolveGeminiImageConfig(config: AiConfig) {
     const ratio = dimensions ? `${dimensions.width}:${dimensions.height}` : value;
     const aspectRatio = value && value.toLowerCase() !== "auto" ? closestGeminiAspectRatio(ratio) : undefined;
     const imageSize = supportsGeminiImageSize(config.model) ? resolveGeminiImageSize(config.quality, dimensions) : undefined;
-    const imageParams = { ...(aspectRatio ? { aspectRatio } : {}), ...(imageSize ? { imageSize } : {}) };
-
-    // 调试日志
-    console.log('=== resolveGeminiImageConfig ===');
-    console.log('Input size:', config.size);
-    console.log('Input quality:', config.quality);
-    console.log('Model:', config.model);
-    console.log('Supports imageSize:', supportsGeminiImageSize(config.model));
-    console.log('Resolved dimensions:', dimensions);
-    console.log('Resolved imageSize:', imageSize);
-    console.log('Resolved aspectRatio:', aspectRatio);
-    console.log('Final imageConfig:', JSON.stringify(imageParams, null, 2));
-
-    // 返回包装在 imageConfig 中的参数
-    return Object.keys(imageParams).length ? { imageConfig: imageParams } : {};
+    const image = { ...(aspectRatio ? { aspectRatio } : {}), ...(imageSize ? { imageSize } : {}) };
+    return Object.keys(image).length ? { imageConfig: image } : {};
 }
 
 function closestGeminiAspectRatio(value: string) {
@@ -233,18 +224,12 @@ function closestGeminiAspectRatio(value: string) {
 
 function resolveGeminiImageSize(quality: string, dimensions: { width: number; height: number } | null) {
     const normalizedQuality = normalizeQuality(quality);
-    console.log('resolveGeminiImageSize - quality:', quality, 'normalized:', normalizedQuality);
-    if (normalizedQuality) {
-        const imageSize = GEMINI_IMAGE_SIZE_BY_QUALITY[normalizedQuality];
-        console.log('Using quality-based imageSize:', imageSize);
-        return imageSize;
-    }
-    if (!dimensions) {
-        console.log('No dimensions and no normalized quality, returning undefined');
-        return undefined;
-    }
+    if (normalizedQuality) return GEMINI_IMAGE_SIZE_BY_QUALITY[normalizedQuality];
+    if (!dimensions) return undefined;
+    const size = `${dimensions.width}x${dimensions.height}`;
+    const scale = inferMediaScale(size);
+    if (Object.values(imageSizePresets[scale]).includes(size)) return scale.toUpperCase();
     const edge = Math.max(dimensions.width, dimensions.height);
-    console.log('Using dimension-based imageSize, edge:', edge);
     if (edge <= 768) return "512";
     if (edge <= 1536) return "1K";
     if (edge <= 3072) return "2K";
@@ -257,7 +242,7 @@ function supportsGeminiImageSize(model: string) {
     return modelLower.includes("gemini-2") || modelLower.includes("gemini-3") || modelLower.includes("imagen");
 }
 
-function resolveImageDataUrl(item: Record<string, unknown>) {
+function resolveImageSource(item: Record<string, unknown>) {
     if (typeof item.b64_json === "string" && item.b64_json) {
         return `data:image/png;base64,${item.b64_json}`;
     }
@@ -276,11 +261,10 @@ function parseImagePayload(payload: ImageApiResponse) {
         || (payload as Record<string, unknown>).images as Array<Record<string, unknown>> | undefined
         || (payload as Record<string, unknown>).results as Array<Record<string, unknown>> | undefined
         || [];
-    const images =
-        imageList
-            .map(resolveImageDataUrl)
-            .filter((value): value is string => Boolean(value))
-            .map((dataUrl) => ({ id: nanoid(), dataUrl }));
+    const images = imageList
+        .map(resolveImageSource)
+        .filter((value): value is string => Boolean(value))
+        .map((dataUrl) => ({ id: nanoid(), dataUrl }));
 
     if (images.length === 0) {
         // Check whether the response contains data in an unrecognized format.
@@ -370,7 +354,7 @@ function aiHeaders(config: AiConfig, contentType?: string) {
 }
 
 function geminiBaseUrl(config: Pick<AiConfig, "baseUrl">) {
-    const normalizedBaseUrl = resolveApiBaseUrl(config.baseUrl);
+    const normalizedBaseUrl = config.baseUrl.trim().replace(/\/+$/, "");
     const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
     return lowerBaseUrl.endsWith("/v1") || lowerBaseUrl.endsWith("/v1beta") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1beta`;
 }
@@ -381,8 +365,8 @@ function geminiModelName(model: string) {
 
 function geminiApiUrl(config: Pick<AiConfig, "baseUrl" | "model">, action?: "generateContent" | "streamGenerateContent") {
     const baseUrl = geminiBaseUrl(config);
-    if (!action) return `${baseUrl}/models`;
-    return `${baseUrl}/models/${encodeURIComponent(geminiModelName(config.model))}:${action}`;
+    if (!action) return withLocalProxy(`${baseUrl}/models`);
+    return withLocalProxy(`${baseUrl}/models/${encodeURIComponent(geminiModelName(config.model))}:${action}`);
 }
 
 function geminiHeaders(config: Pick<AiConfig, "apiKey">) {
@@ -718,19 +702,11 @@ async function requestGeminiImagesOnce(config: AiConfig, prompt: string, referen
         contents: [{ role: "user", parts }],
     };
 
-    // 记录完整的请求体
-    console.log('=== Gemini API Request Body ===');
-    console.log(JSON.stringify(requestBody, null, 2));
-
     const response = await axios.post<GeminiPayload>(
         geminiApiUrl(config, "generateContent"),
         requestBody,
         { headers: geminiHeaders(config), signal: options?.signal },
     );
-
-    // 记录响应
-    console.log('=== Gemini API Response ===');
-    console.log('Response data:', response.data);
 
     return parseGeminiImagePayload(response.data);
 }
@@ -746,16 +722,7 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
                 return part.fileData?.fileUri || null;
             })
             .filter((value): value is string => Boolean(value))
-            .map((dataUrl) => {
-                // 记录图片尺寸
-                const img = new Image();
-                img.onload = () => {
-                    console.log('=== Generated Image Size ===');
-                    console.log(`Width: ${img.width}, Height: ${img.height}`);
-                };
-                img.src = dataUrl;
-                return { id: nanoid(), dataUrl };
-            }) || [];
+            .map((dataUrl) => ({ id: nanoid(), dataUrl })) || [];
     if (!images.length) throw new Error(apiText("geminiNoImage"));
     return images;
 }
@@ -807,7 +774,8 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 ...(quality ? { quality } : {}),
                 ...(requestSize ? { size: requestSize } : {}),
                 ...(background ? { background } : {}),
-                response_format: "b64_json",
+                // gpt-image models reject response_format; they always return b64.
+                ...(/gpt-image/.test(requestConfig.model) ? {} : { response_format: "b64_json" }),
                 output_format: IMAGE_OUTPUT_FORMAT,
             },
             {
@@ -823,7 +791,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     }
 }
 
-export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], mask?: ReferenceImage, options?: RequestOptions) {
+export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);
@@ -851,7 +819,6 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         }
     }
     if (requestConfig.apiFormat === "gemini") {
-        if (mask) throw new Error(apiText("geminiMaskUnsupported"));
         try {
             const images = await requestGeminiImages(requestConfig, requestPrompt, references, n, options);
             requestUserInfoRefresh();
@@ -901,7 +868,10 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     formData.set("model", requestConfig.model);
     formData.set("prompt", withSystemPrompt(requestConfig, requestPrompt));
     formData.set("n", String(n));
-    formData.set("response_format", "b64_json");
+    // gpt-image models reject response_format; they always return b64.
+    if (!/gpt-image/.test(requestConfig.model)) {
+        formData.set("response_format", "b64_json");
+    }
     formData.set("output_format", IMAGE_OUTPUT_FORMAT);
     if (quality) {
         formData.set("quality", quality);
@@ -913,8 +883,8 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         formData.set("background", background);
     }
     const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
-    files.forEach((file) => formData.append("image", file));
-    if (mask) formData.set("mask", dataUrlToFile(mask));
+    const imageField = files.length > 1 ? "image[]" : "image";
+    files.forEach((file) => formData.append(imageField, file));
 
     try {
         const response = await axios.post<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), formData, { headers: aiHeaders(requestConfig), signal: options?.signal });
