@@ -285,7 +285,6 @@ export default function ImagePage() {
 
             if (controller.signal.aborted) return;
 
-<<<<<<< HEAD
             const logImages = await Promise.all(
                 successImages.map(async (image) => {
                     const stored = await uploadImage(image.dataUrl);
@@ -315,27 +314,27 @@ export default function ImagePage() {
             });
 
             // 保存到历史记录
-            await saveLog(
-=======
-        try {
-            saveLog(
->>>>>>> upstream/main
-                buildLog({
-                    prompt: text,
-                    model,
-                    config: { ...snapshot.config, count: String(generationCount) },
-                    references: snapshot.references,
-                    durationMs: performance.now() - batchStartedAt,
-                    successCount,
-                    failCount,
-                    status: successCount ? "success" : "failed",
-                    images: successImages,
-                }),
-            );
+            try {
+                await saveLog(
+                    buildLog({
+                        prompt: text,
+                        model,
+                        config: { ...snapshot.config, count: String(generationCount) },
+                        references: snapshot.references,
+                        durationMs: performance.now() - batchStartedAt,
+                        successCount,
+                        failCount,
+                        status: successCount ? "success" : "failed",
+                        images: logImages,
+                    }),
+                );
 
-            // 不需要手动更新任务状态，updateTaskImage 已经自动处理了
+                // 不需要手动更新任务状态，updateTaskImage 已经自动处理了
 
-            successCount ? message.success(t("imageWorkbench.generated")) : message.error(failed?.reason instanceof Error ? failed.reason.message : t("workbench.generationFailed"));
+                successCount ? message.success(t("imageWorkbench.generated")) : message.error(failed?.reason instanceof Error ? failed.reason.message : t("workbench.generationFailed"));
+            } catch (error) {
+                console.error("Failed to save log:", error);
+            }
         }).catch((error) => {
             console.error("Generation error:", error);
             // updateTaskImage 已经自动处理了失败状态
@@ -476,13 +475,8 @@ export default function ImagePage() {
             const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references, undefined, { signal }) : await requestGeneration(snapshot.config, snapshot.text, { signal });
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
-<<<<<<< HEAD
-            const meta = await readImageMeta(image.dataUrl);
-            const nextImage: GeneratedImage = { id: image.id, dataUrl: image.dataUrl, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: getDataUrlByteSize(image.dataUrl), mimeType: meta.mimeType };
-=======
             const stored = await uploadImage(image.dataUrl);
             const nextImage: GeneratedImage = { id: image.id, dataUrl: stored.url, ...(stored.storageKey ? { storageKey: stored.storageKey } : {}), durationMs: performance.now() - itemStartedAt, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
->>>>>>> upstream/main
             setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
             return nextImage;
         } catch (error) {
@@ -500,7 +494,6 @@ export default function ImagePage() {
         const controller = new AbortController();
         const unregister = registerAiRequest(controller);
         try {
-<<<<<<< HEAD
             const image = await runGenerationSlot(index, snapshot, controller.signal);
             if (controller.signal.aborted) return;
             const stored = await uploadImage(image.dataUrl);
@@ -508,10 +501,6 @@ export default function ImagePage() {
             const logImage = { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
             setResults((value) => updateResultAt(value, index, { image: { ...image, dataUrl: stored.url, storageKey: stored.storageKey } }));
             await saveLog(
-=======
-            const image = await runGenerationSlot(index, snapshot);
-            saveLog(
->>>>>>> upstream/main
                 buildLog({
                     prompt: snapshot.text,
                     model,
@@ -521,7 +510,7 @@ export default function ImagePage() {
                     successCount: 1,
                     failCount: 0,
                     status: "success",
-                    images: [image],
+                    images: [logImage],
                 }),
             );
             message.success(t("workbench.retrySuccess"));
