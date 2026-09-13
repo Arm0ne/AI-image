@@ -22,6 +22,8 @@ export default {
         all: "全部",
         view: "查看",
         download: "下载",
+        downloadSuccess: "下载成功",
+        downloadFailed: "下载失败",
         upload: "上传",
         requestCanceled: "请求已取消",
         durationMinutes: "{{minutes}}分{{seconds}}秒",

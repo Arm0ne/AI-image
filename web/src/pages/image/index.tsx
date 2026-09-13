@@ -14,7 +14,8 @@ import { registerAiRequest } from "@/lib/ai-request-registry";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
-import { formatBytes, formatDuration } from "@/lib/image-utils";
+import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
+import { prepareImageForDownload } from "@/lib/image-format-converter";
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -371,9 +372,15 @@ export default function ImagePage() {
     }, [autoRunToken]);
 
     const downloadImage = async (image: GeneratedImage, index: number) => {
-        const format = useConfigStore.getState().config.imageDownloadFormat;
-        const { dataUrl, extension } = await prepareImageForDownload(image.dataUrl, format);
-        saveAs(dataUrl, `image-${index + 1}.${extension}`);
+        try {
+            const format = useConfigStore.getState().config.imageDownloadFormat;
+            const { dataUrl, extension } = await prepareImageForDownload(image.dataUrl, format);
+            saveAs(dataUrl, `image-${index + 1}.${extension}`);
+            message.success(t("common.downloadSuccess") || "下载成功");
+        } catch (error) {
+            console.error("Download failed:", error);
+            message.error(t("common.downloadFailed") || "下载失败");
+        }
     };
 
     const addResultToReferences = async (image: GeneratedImage, index: number) => {

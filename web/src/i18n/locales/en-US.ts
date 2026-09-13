@@ -22,6 +22,8 @@ export default {
         all: "All",
         view: "View",
         download: "Download",
+        downloadSuccess: "Download successful",
+        downloadFailed: "Download failed",
         upload: "Upload",
         requestCanceled: "Request canceled",
         durationMinutes: "{{minutes}}m {{seconds}}s",
