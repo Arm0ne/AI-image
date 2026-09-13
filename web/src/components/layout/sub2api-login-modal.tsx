@@ -108,13 +108,22 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
                 </Form.Item>
 
                 <Form.Item style={{ marginBottom: 0 }}>
-                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                        <Button onClick={onClose}>
-                            {t("common.cancel")}
+                    <div style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center" }}>
+                        <Button
+                            type="primary"
+                            href={SUB2API_URL}
+                            target="_blank"
+                        >
+                            注册API账号
                         </Button>
-                        <Button type="primary" htmlType="submit" loading={loading}>
-                            {t("config.channels.loginAndSync")}
-                        </Button>
+                        <div style={{ display: "flex", gap: 8 }}>
+                            <Button onClick={onClose}>
+                                {t("common.cancel")}
+                            </Button>
+                            <Button type="primary" htmlType="submit" loading={loading}>
+                                {t("config.channels.loginAndSync")}
+                            </Button>
+                        </div>
                     </div>
                 </Form.Item>
             </Form>
