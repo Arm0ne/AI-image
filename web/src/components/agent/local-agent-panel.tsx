@@ -109,7 +109,7 @@ function conversationBootstrapView(conversation: AgentConversationState) {
     }));
     const services = Object.values(mcpStartupStatuses);
     const pending = services.filter((item) => item.status === "running").length;
-    const bootstrapStatus: AgentBootstrapStatus | null = conversation.status === "idle" || conversation.status === "preparing"
+    const bootstrapStatus: AgentBootstrapStatus | null = conversation.status === "preparing"
         ? services.length
             ? { key: "mcp:starting", text: rt("mcpServicesStarting"), detail: pending ? rt("toolServicesPending", { count: pending }) : rt("checkingToolServices"), status: "running" }
             : { key: "codex:preparing", text: rt("conversationInitializing"), detail: rt("conversationCreating"), status: "running" }
@@ -1065,7 +1065,7 @@ export function LocalAgentPanel({ embedded, headless, autoConnect }: { embedded?
         let deletedCount = 0;
         try {
             for (const threadId of new Set(threadIds)) {
-                await fetchAgentJson(endpoint, token, `/agent/codex/threads/${encodeURIComponent(threadId)}/delete`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ clientId: clientIdRef.current }) });
+                await fetchAgentJson(endpoint, token, `/agent/codex/threads/${encodeURIComponent(threadId)}/delete`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ clientId: clientIdRef.current, permissionMode }) });
                 threadMessagesRef.current.delete(threadId);
                 deletedCount += 1;
             }
@@ -1405,9 +1405,9 @@ export function LocalAgentPanel({ embedded, headless, autoConnect }: { embedded?
                         attachments={attachments.map((attachment) => agentAttachmentToChatAttachment(attachment, endpoint, token))}
                         disabled={!connected || !conversationReady || loadingThreads}
                         sending={sending || waiting}
-                        placeholder={conversation.status === "idle" || conversation.status === "preparing"
+                        placeholder={conversation.status === "preparing"
                             ? t("agent.panel.mcpInitializing")
-                            : conversation.status === "failed"
+                            : conversation.status === "idle" || conversation.status === "failed"
                                 ? t("agent.panel.initFailed")
                                 : t("agent.panel.placeholder")}
                         theme={theme}

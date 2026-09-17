@@ -299,9 +299,14 @@ export function startHttpServer() {
     app.post("/agent/codex/threads/:threadId/delete", codexMutation(async (req, res) => {
         const workspace = ensureSiteWorkspace(config);
         const threadId = routeParam(req.params.threadId);
+        const clientId = String(req.body?.clientId || "");
+        const deletingActiveThread = workspace.activeThreadId === threadId;
         await archiveCodexThread(emit, threadId, workspace.workspacePath);
-        const nextWorkspace = setActiveThread(workspace.activeThreadId === threadId ? "" : workspace.activeThreadId || "", { sourceClientId: String(req.body?.clientId || "") });
-        res.json({ ok: true, workspace: nextWorkspace, conversation: session.conversationStateSnapshot });
+        if (!deletingActiveThread) return res.json({ ok: true, workspace: ensureSiteWorkspace(config), conversation: session.conversationStateSnapshot });
+        session.beginConversation({ sourceClientId: clientId });
+        setActiveThread("", { emptyThread: true, draftThread: true, sourceClientId: clientId }, true);
+        await prepareDraftThread(clientId, permissionMode(req.body?.permissionMode));
+        res.json({ ok: true, workspace: ensureSiteWorkspace(config), conversation: session.conversationStateSnapshot });
     }));
     app.post("/agent/codex/turn", codexMutation(async (req, res) => {
         const attachments = Array.isArray(req.body?.attachments) ? (req.body.attachments as AgentAttachment[]) : [];
