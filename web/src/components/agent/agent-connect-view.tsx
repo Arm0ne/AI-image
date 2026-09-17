@@ -6,8 +6,8 @@ import { useTranslation } from "react-i18next";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 
-const AGENT_PLUGIN_REMOVE_COMMAND = "codex plugin remove infinite-canvas";
-const AGENT_MCP_REMOVE_COMMAND = "codex mcp remove infinite-canvas";
+const AGENT_PLUGIN_REMOVE_COMMAND = "codex plugin remove alien-ai-studio-plugin";
+const AGENT_MCP_REMOVE_COMMAND = "codex mcp remove alien-ai-studio";
 
 export function AgentConnectView({
     theme,
@@ -34,7 +34,7 @@ export function AgentConnectView({
 }) {
     const { t } = useTranslation();
     const { message } = App.useApp();
-    const steps = [{ title: t("agent.connect.pluginTitle"), text: t("agent.connect.pluginText") }, { title: t("agent.connect.directTitle"), text: t("agent.connect.directText"), command: "npx -y @basketikun/canvas-agent@latest" }];
+    const steps = [{ title: t("agent.connect.pluginTitle"), text: t("agent.connect.pluginText") }, { title: t("agent.connect.directTitle"), text: t("agent.connect.directText"), command: "npx -y @arm0ne/alien-ai-studio-agent@latest" }];
     const statusText = connectError ? t("agent.status.failed") : connected ? activity : enabled ? t("agent.status.connecting") : t("agent.status.disconnected");
     const statusColor = connectError ? "#dc2626" : connected ? "#16a34a" : enabled ? "#d97706" : theme.node.muted;
     const copyCommand = (command: string) => {

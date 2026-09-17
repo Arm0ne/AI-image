@@ -32,6 +32,7 @@ const SITE_TOOLS = new Set<ToolName>([
     "workbench_image_generate",
     "workbench_video_get_config",
     "workbench_video_generate",
+    "prompts_search",
     "assets_list",
     "assets_add",
     "generation_get_status",
@@ -151,7 +152,7 @@ export class CanvasSession {
         return this.updateConversation({
             threadId,
             status: hasPending ? "preparing" : requiredFailure ? "failed" : hasFailure ? "warning" : "ready",
-            error: requiredFailure ? `Infinite Canvas MCP 初始化失败${requiredFailureDetail ? `：${requiredFailureDetail}` : ""}` : undefined,
+            error: requiredFailure ? `Alien AI Studio 画布 MCP 初始化失败${requiredFailureDetail ? `：${requiredFailureDetail}` : ""}` : undefined,
         });
     }
 

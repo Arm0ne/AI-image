@@ -1,51 +1,50 @@
 ---
 title: Codex App Plugin
-description: Install and use the Infinite Canvas plugin in Codex App
+description: Install Alien AI Studio Plugin and launch the site from Codex
 ---
 
 # Codex App Plugin
 
-The plugin connects Codex to a local Canvas Agent, allowing Codex to open Infinite Canvas, read and create nodes, connect nodes, and start generation workflows. Its source is in `plugins/infinite-canvas/`.
+Alien AI Studio Plugin connects Codex, the local Alien AI Studio Agent, and the web canvas. Enter `启动创作站` or the compatible phrase `启动生图站` in Codex to open [img.panlai.me](https://img.panlai.me) in your default browser and connect the site's Codex panel automatically.
 
-## Ask Codex to install it
+The plugin source is in `plugins/alien-ai-studio-plugin/`, and the local Agent source is in `canvas-agent/`.
 
-Send this request to Codex:
+## Install
+
+```bash
+codex plugin marketplace add Arm0ne/AI-image
+codex plugin add alien-ai-studio-plugin@alien-ai-studio
+```
+
+Start a new Codex task after installation so the Skill and MCP tools load completely, then enter:
 
 ```text
-Install the Infinite Canvas Codex plugin from https://github.com/basketikun/infinite-canvas.git.
-Clone it to ~/plugins/infinite-canvas, verify plugins/infinite-canvas/.codex-plugin/plugin.json,
-add the repository to my personal marketplace with `codex plugin marketplace add ~`,
-then install `infinite-canvas@personal`. Validate the installation and tell me whether a new
-conversation is required to load the Skill and MCP tools.
+启动创作站
 ```
 
-## Manual installation
+The default mode creates a canvas. You can also ask for the most recent canvas or the canvas picker.
+
+## Local development
+
+From the repository root:
+
+```powershell
+codex plugin marketplace add "$PWD"
+codex plugin add alien-ai-studio-plugin@alien-ai-studio
+```
+
+The repository marketplace points to `./plugins/alien-ai-studio-plugin`. Reinstall the plugin and start a new Codex task after changing its manifest, Skills, or MCP configuration.
+
+## Run the Agent directly
 
 ```bash
-mkdir -p ~/plugins
-git clone https://github.com/basketikun/infinite-canvas.git ~/plugins/infinite-canvas
-codex plugin marketplace add ~
-codex plugin add infinite-canvas@personal
+npx -y @arm0ne/alien-ai-studio-agent@latest
 ```
 
-The personal marketplace entry must point to `./plugins/infinite-canvas/plugins/infinite-canvas`. Start a new Codex conversation after installation so the Skill and MCP tools load completely.
-
-For development from this repository:
+To add the MCP without the plugin:
 
 ```bash
-cd /path/to/infinite-canvas
-codex plugin marketplace add "$(pwd)"
-codex plugin add infinite-canvas@infinite-canvas-local
+codex mcp add alien-ai-studio -- npx -y @arm0ne/alien-ai-studio-agent@latest mcp
 ```
 
-## Usage
-
-In a new Codex conversation, ask it to open Infinite Canvas, create a canvas, and connect Codex. The plugin starts Canvas Agent, reads its connection URL and token, opens `https://canvas.best/`, and creates and connects a canvas. It starts a local frontend only when explicitly requested.
-
-You can then ask Codex to summarize the current canvas, create prompts from selected nodes, or organize nodes into a generation workflow.
-
-Reinstall or refresh the plugin after changing its manifest, MCP configuration, Skills, exposed MCP tools, app, or entry scripts. The agent's default MCP command is:
-
-```bash
-npx -y @basketikun/canvas-agent@latest mcp
-```
+The Agent listens only on `127.0.0.1`. Plugin launches use a one-time ticket that expires after 60 seconds. The connection token stays in the URL fragment and is removed by the web app immediately after reading it.

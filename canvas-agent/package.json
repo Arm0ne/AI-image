@@ -1,22 +1,25 @@
 {
-  "name": "@basketikun/canvas-agent",
-  "version": "0.6.0",
+  "name": "@arm0ne/alien-ai-studio-agent",
+  "version": "0.1.0",
+  "description": "Local Codex bridge for Alien AI Studio and img.panlai.me.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "canvas-agent": "dist/index.js"
+    "alien-ai-studio-agent": "dist/index.js"
   },
   "files": [
     "dist",
     "agent-instructions.md",
+    "LICENSE",
+    "NOTICE",
     "README.md"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
     "debug": "tsx src/index.ts --debug",
-    "test": "tsx --test src/config.test.ts src/canvas/operations.test.ts src/canvas/session.test.ts src/agent/codex-client.test.ts src/agent/codex-history.test.ts src/agent/message-metadata.test.ts src/skills/store.test.ts src/utils/agent-runtime.test.ts",
+    "test": "tsx --test src/config.test.ts src/site-launch.test.ts src/canvas/operations.test.ts src/canvas/session.test.ts src/agent/codex-client.test.ts src/agent/codex-history.test.ts src/agent/message-metadata.test.ts src/skills/store.test.ts src/utils/agent-runtime.test.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "prepack": "npm run build"
@@ -40,6 +43,22 @@
   "engines": {
     "node": ">=18"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Arm0ne/AI-image.git",
+    "directory": "canvas-agent"
+  },
+  "homepage": "https://img.panlai.me",
+  "bugs": {
+    "url": "https://github.com/Arm0ne/AI-image/issues"
+  },
+  "keywords": [
+    "codex",
+    "mcp",
+    "multimodal-generation",
+    "canvas",
+    "alien-ai-studio"
+  ],
   "publishConfig": {
     "access": "public"
   }

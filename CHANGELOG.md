@@ -2,6 +2,8 @@
 
 ## Unreleased
 
++ [新增] 将 Alien AI Studio Plugin 与本地 Agent 整合进主仓库，支持在 Codex 输入“启动创作站”或“启动生图站”后通过系统默认浏览器打开 `img.panlai.me` 并自动连接右侧 Codex 面板。
++ [调整] 本地 Agent 改由公开包 `@arm0ne/alien-ai-studio-agent` 分发，插件、Marketplace、网站连接说明和发布流程统一使用 Alien AI Studio 品牌。
 + [修复] 生图网络错误不再一律误报为跨域问题；生产环境保持浏览器直连 Panlai API，避免服务器出口被上游拒绝导致全部生图失败。
 + [修复] 本地开发环境停用生产版本检测，避免测试期间反复弹出更新提示或强制刷新。
 + [优化] 网页更新检测改用构建时自动生成的标识并移除原作者 GitHub 版本读取，不再要求每次部署手动修改版本号。

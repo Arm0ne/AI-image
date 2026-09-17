@@ -1,4 +1,4 @@
-# Infinite Canvas Documentation Index
+# Alien AI Studio Documentation Index
 
 ## Overview
 

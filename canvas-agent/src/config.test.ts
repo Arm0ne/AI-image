@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { writeConfigFile, type CanvasAgentConfig } from "./config.js";
+import { configuredOrigins, SITE_ORIGIN, writeConfigFile, type CanvasAgentConfig } from "./config.js";
 
 const sample: CanvasAgentConfig = { url: "http://127.0.0.1:17371", token: "test-token" };
 
@@ -51,5 +51,16 @@ test("writeConfigFile persists the config content", () => {
         assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), sample);
     } finally {
         fs.rmSync(base, { recursive: true, force: true });
+    }
+});
+
+test("configuredOrigins always allows production and only explicit development origins", () => {
+    const previous = process.env.ALIEN_AI_STUDIO_ALLOWED_ORIGINS;
+    process.env.ALIEN_AI_STUDIO_ALLOWED_ORIGINS = "http://localhost:5173, http://127.0.0.1:4173, http://localhost:5173";
+    try {
+        assert.deepEqual(configuredOrigins(), [SITE_ORIGIN, "http://localhost:5173", "http://127.0.0.1:4173"]);
+    } finally {
+        if (previous === undefined) delete process.env.ALIEN_AI_STUDIO_ALLOWED_ORIGINS;
+        else process.env.ALIEN_AI_STUDIO_ALLOWED_ORIGINS = previous;
     }
 });

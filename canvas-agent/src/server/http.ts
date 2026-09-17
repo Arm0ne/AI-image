@@ -9,7 +9,8 @@ import type { CodexReasoningEffort, CodexSkillSelector } from "../agent/codex-pr
 import { messageMetadataStore } from "../agent/message-metadata.js";
 import type { AgentAttachment, AgentPermissionMode } from "../agent/types.js";
 import { AGENT_PROTOCOL_VERSION, CanvasSession } from "../canvas/session.js";
-import { DEFAULT_PORT, ensureSiteWorkspace, loadConfig, saveConfig, updateSiteWorkspace, type CanvasAgentConfig } from "../config.js";
+import { DEFAULT_PORT, ensureSiteWorkspace, loadConfig, saveConfig, updateSiteWorkspace, VERSION, type CanvasAgentConfig } from "../config.js";
+import { buildSiteLaunchUrl, LaunchTicketStore, type LaunchMode } from "../site-launch.js";
 import { logger } from "../utils/logger.js";
 import { checkVersions } from "../version-check.js";
 import { SkillStore, SkillStoreError } from "../skills/store.js";
@@ -23,6 +24,7 @@ export function startHttpServer() {
 
     const initialWorkspace = ensureSiteWorkspace(config);
     const session = new CanvasSession(initialWorkspace.activeThreadId || "");
+    const launchTickets = new LaunchTicketStore();
     const skillStore = new SkillStore(initialWorkspace.workspacePath);
     /** 将 Agent 事件广播到所属线程或全部网页。 */
     const emit = (type: string, payload: unknown) => {
@@ -120,11 +122,23 @@ export function startHttpServer() {
         if (req.method === "OPTIONS") return void res.json({});
         next();
     });
-    app.get("/health", (_req, res) => res.json(session.health()));
+    app.get("/health", (_req, res) => res.json({ ...session.health(), service: "alien-ai-studio-agent", version: VERSION }));
     app.get("/config", (_req, res) => res.json({ ok: true, protocolVersion: AGENT_PROTOCOL_VERSION, url: config.url, hasToken: true }));
+    app.get("/launch/:ticket", (req, res) => {
+        const launch = launchTickets.consume(routeParam(req.params.ticket));
+        if (!launch) return void res.status(404).type("text/plain").send("启动链接已失效，请回到 Codex 重新执行“启动创作站”。");
+        res.setHeader("Cache-Control", "no-store");
+        res.redirect(302, buildSiteLaunchUrl(config, launch.mode));
+    });
     app.use((req, res, next) => {
         if (validToken(req, requestUrl(req, config), config.token)) return next();
         res.status(401).json({ ok: false, error: "invalid token" });
+    });
+    app.post("/launch-tickets", (req, res) => {
+        const mode = launchMode(req.body?.mode);
+        const ticket = launchTickets.issue(mode);
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ ok: true, launchUrl: `${config.url}/launch/${ticket}` });
     });
     app.get("/events", (req, res) => {
         session.openEvents(requestUrl(req, config), res, ensureSiteWorkspace(config).activeThreadId || "");
@@ -432,13 +446,13 @@ export function startHttpServer() {
     });
 
     app.listen(port, "127.0.0.1", () => {
-        console.log("Infinite Canvas Agent");
+        console.log("Alien AI Studio Agent");
         checkVersions();
         console.log(`Local URL: ${config.url}`);
         console.log(`Connect token: ${config.token}`);
         console.log("Codex MCP is not installed by this command.");
-        console.log("Optional MCP add: codex mcp add infinite-canvas -- npx -y @basketikun/canvas-agent@latest mcp");
-        console.log("Remove manually added MCP: codex mcp remove infinite-canvas");
+        console.log("Optional MCP add: codex mcp add alien-ai-studio -- npx -y @arm0ne/alien-ai-studio-agent@latest mcp");
+        console.log("Remove manually added MCP: codex mcp remove alien-ai-studio");
         if (logger.enabled) console.log(`Debug log: ${logger.filePath}`);
         logger.info("Canvas Agent started", { url: config.url, workspace: ensureSiteWorkspace(config).workspacePath, debugLog: logger.filePath });
         const activeThreadId = initialWorkspace.activeThreadId || "";
@@ -469,6 +483,10 @@ function permissionMode(value: unknown): AgentPermissionMode {
 
 function reasoningEffort(value: unknown): CodexReasoningEffort | undefined {
     return value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "max" || value === "ultra" ? value : undefined;
+}
+
+function launchMode(value: unknown): LaunchMode {
+    return value === "recent" || value === "choose" ? value : "new";
 }
 
 function startupStatus(value: unknown): "starting" | "ready" | "failed" | "cancelled" {
@@ -517,21 +535,17 @@ function requestUrl(req: Request, config: CanvasAgentConfig) {
     return new URL(req.originalUrl || req.url || "/", config.url);
 }
 
-/** 设置跨域响应头并记录通过 token 授权的来源。 */
+/** 只允许生产站点和显式配置的开发 Origin 访问本地 Agent。 */
 function setCors(req: Request, res: Response, url: URL, config: CanvasAgentConfig) {
     const origin = req.headers.origin;
-    res.setHeader("Access-Control-Allow-Origin", origin || "*");
+    const allowed = !origin || config.origins?.includes(origin);
+    if (origin && allowed) res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Headers", "content-type,x-canvas-agent-token");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     res.setHeader("Access-Control-Allow-Private-Network", "true");
-    if (!origin || req.method === "OPTIONS" || url.pathname === "/health" || url.pathname === "/config") return true;
-    config.origins ||= [];
-    if (validToken(req, url, config.token) && !config.origins.includes(origin)) {
-        config.origins.push(origin);
-        saveConfig(config);
-    }
+    if (!origin || url.pathname.startsWith("/launch/")) return true;
     res.setHeader("Vary", "Origin");
-    return config.origins.includes(origin);
+    return Boolean(allowed);
 }
 
 /** 校验请求查询参数或请求头中的连接 token。 */

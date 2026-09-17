@@ -39,6 +39,7 @@ export const toolNames = [
     "workbench_image_generate",
     "workbench_video_get_config",
     "workbench_video_generate",
+    "prompts_search",
     "assets_list",
     "assets_add",
 ] as const;

@@ -4,8 +4,10 @@ import os from "node:os";
 import path from "node:path";
 
 export const DEFAULT_PORT = 17371;
-export const CONFIG_DIR = path.join(os.homedir(), ".infinite-canvas");
-export const CONFIG_FILE = path.join(CONFIG_DIR, "canvas-agent.json");
+export const SITE_URL = "https://img.panlai.me";
+export const SITE_ORIGIN = new URL(SITE_URL).origin;
+export const CONFIG_DIR = process.env.ALIEN_AI_STUDIO_CONFIG_DIR ? path.resolve(process.env.ALIEN_AI_STUDIO_CONFIG_DIR) : path.join(os.homedir(), ".alien-ai-studio");
+export const CONFIG_FILE = path.join(CONFIG_DIR, "alien-ai-studio-agent.json");
 export const VERSION = readPackageVersion();
 export const AGENT_PROMPT = fs.readFileSync(new URL("../agent-instructions.md", import.meta.url), "utf8");
 const initializedWorkspaces = new Set<string>();
@@ -16,12 +18,20 @@ export type CanvasAgentConfig = { url: string; token: string; origins?: string[]
 /** 读取本地 Canvas Agent 配置，不存在时生成默认配置。 */
 export function loadConfig(create = false): CanvasAgentConfig {
     try {
-        return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")) as CanvasAgentConfig;
+        const config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")) as CanvasAgentConfig;
+        config.origins = configuredOrigins();
+        return config;
     } catch {
-        const config = { url: `http://127.0.0.1:${Number(process.env.PORT) || DEFAULT_PORT}`, token: crypto.randomBytes(18).toString("hex") };
+        const config = { url: `http://127.0.0.1:${Number(process.env.PORT) || DEFAULT_PORT}`, token: crypto.randomBytes(18).toString("hex"), origins: configuredOrigins() };
         if (create) saveConfig(config);
         return config;
     }
+}
+
+/** 返回生产站点和显式开发配置允许连接的 Origin。 */
+export function configuredOrigins() {
+    const development = String(process.env.ALIEN_AI_STUDIO_ALLOWED_ORIGINS || "").split(",").map((value) => value.trim()).filter(Boolean);
+    return [...new Set([SITE_ORIGIN, ...development])];
 }
 
 /** 将 Canvas Agent 配置写入用户配置目录。 */
@@ -69,7 +79,7 @@ function initializeWorkspace(workspacePath: string) {
     fs.mkdirSync(workspacePath, { recursive: true });
     const instructionsFile = path.join(workspacePath, "AGENTS.md");
     const current = fs.existsSync(instructionsFile) ? fs.readFileSync(instructionsFile, "utf8") : "";
-    if (!current || current.startsWith("# Infinite Canvas Agent")) fs.writeFileSync(instructionsFile, AGENT_PROMPT);
+    if (!current || current.startsWith("# Infinite Canvas Agent") || current.startsWith("# Alien AI Studio Agent")) fs.writeFileSync(instructionsFile, AGENT_PROMPT);
     initializedWorkspaces.add(workspacePath);
 }
 

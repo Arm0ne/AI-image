@@ -1,0 +1,29 @@
+{
+  "name": "alien-ai-studio-plugin",
+  "version": "0.1.0",
+  "description": "Launch and operate Alien AI Studio through a local Codex Agent.",
+  "author": {
+    "name": "Arm0ne",
+    "url": "https://github.com/Arm0ne"
+  },
+  "homepage": "https://img.panlai.me",
+  "repository": "https://github.com/Arm0ne/AI-image",
+  "license": "MIT",
+  "keywords": ["alien-ai-studio", "multimodal-generation", "canvas", "mcp", "codex"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Alien AI Studio Plugin",
+    "shortDescription": "Launch Alien AI Studio and create on its canvas with Codex.",
+    "longDescription": "Starts the local Alien AI Studio Agent, opens img.panlai.me in your default browser, connects the website automatically, and lets Codex inspect and operate the active canvas.",
+    "developerName": "Arm0ne",
+    "category": "Productivity",
+    "capabilities": ["MCP", "Canvas", "Multimodal Generation"],
+    "websiteURL": "https://img.panlai.me",
+    "defaultPrompt": [
+      "启动创作站",
+      "读取当前画布并总结内容",
+      "在当前画布创建一组多模态创作提示词"
+    ]
+  }
+}
