@@ -2,6 +2,7 @@
 
 ## Unreleased
 
++ [修复] 画布多选导出的 ZIP 文件名不再包含节点链路前缀和换行控制字符，Windows 资源管理器可正常查看与解压全部文件。
 + [调整] 网站首次打开默认使用深色主题，画布左侧元素选择器的对钩改用品牌橙色并提升深色模式下的辨识度。
 + [新增] 将 Alien AI Studio Plugin 与本地 Agent 整合进主仓库，支持在 Codex 输入“启动创作站”或“启动生图站”后通过系统默认浏览器打开 `img.panlai.me` 并自动连接右侧 Codex 面板。
 + [调整] 本地 Agent 改由公开包 `@arm0ne/alien-ai-studio-agent` 分发，插件、Marketplace、网站连接说明和发布流程统一使用 Alien AI Studio 品牌。

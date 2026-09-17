@@ -35,7 +35,7 @@ export async function exportCanvasNodes(nodes: CanvasNodeData[], fileName = i18n
     const zipFiles: { name: string; data: BlobPart }[] = [];
     const used = new Set<string>();
     const uniqueName = (base: string, ext: string) => {
-        const safe = safeFileName(base) || i18n.t("canvas.export.item");
+        const safe = safeFileName(exportTitle(base)) || i18n.t("canvas.export.item");
         let name = `${safe}.${ext}`;
         for (let i = 1; used.has(name); i += 1) name = `${safe}-${i}.${ext}`;
         used.add(name);
@@ -72,7 +72,13 @@ function collectStorageKeys(value: unknown, keys = new Set<string>()) {
 }
 
 function safeFileName(value: string) {
-    return value.replace(/[\\/:*?"<>|]/g, "_");
+    const safe = value.normalize("NFC").replace(/[\u0000-\u001f\u007f\\/:*?"<>|]+/g, "_").replace(/[ .]+$/g, "");
+    return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(safe) ? `_${safe}` : safe;
+}
+
+function exportTitle(value: string) {
+    const parts = value.split(/[\r\n]+/).map((part) => part.trim()).filter(Boolean);
+    return parts[parts.length - 1] || value;
 }
 
 function fileExtension(mimeType: string, storageKey: string) {
