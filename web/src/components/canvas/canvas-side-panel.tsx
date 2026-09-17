@@ -281,7 +281,7 @@ function CanvasNodesTab({ nodes, selectedNodeIds, onFocusNode, onPreviewNode, th
 function CheckMark({ checked, theme }: { checked: boolean; theme: CanvasTheme }) {
     return (
         <span className="grid size-4 shrink-0 place-items-center rounded border transition" style={{ borderColor: checked ? theme.toolbar.activeText : theme.node.stroke, background: checked ? theme.toolbar.activeText : "transparent" }}>
-            {checked ? <Check className="size-3 text-white" /> : null}
+            {checked ? <Check className="size-3 text-[#FF8C42]" strokeWidth={3} /> : null}
         </span>
     );
 }
