@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, LoaderCircle, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Tooltip, Typography } from "antd";
 import localforage from "localforage";
 import { saveAs } from "file-saver";
@@ -17,7 +17,7 @@ import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { prepareImageForDownload } from "@/lib/image-format-converter";
 import { requestEdit, requestGeneration } from "@/services/api/image";
-import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
+import { deleteStoredImages, getImageBlob, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
 import { useGenerationStore, type GenerationTask } from "@/stores/use-generation-store";
@@ -67,7 +67,6 @@ type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "
 type UpdateAiConfig = <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
 
 const LOG_STORE_KEY = "infinite-canvas:image_generation_logs";
-const LOGS_UPDATED_EVENT = "infinite-canvas:image-generation-logs-updated";
 const RESULT_ACTION_BUTTON_CLASS = "min-w-0 px-1.5 [&_.ant-btn-icon]:shrink-0 [&>span:last-child]:min-w-0 [&>span:last-child]:truncate";
 const logStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_generation_logs" });
 
@@ -107,6 +106,7 @@ export default function ImagePage() {
     const addTask = useGenerationStore((state) => state.addTask);
     const updateTask = useGenerationStore((state) => state.updateTask);
     const updateTaskImage = useGenerationStore((state) => state.updateTaskImage);
+    const removeTask = useGenerationStore((state) => state.removeTask);
     const getActiveTask = useGenerationStore((state) => state.getActiveTask);
     const currentTaskIdRef = useRef<string | undefined>(undefined);
 
@@ -114,7 +114,7 @@ export default function ImagePage() {
     const canGenerate = Boolean(prompt.trim());
     const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
 
-    const previewGenerationTask = (task: GenerationTask) => {
+    const previewGenerationTask = useCallback((task: GenerationTask) => {
         currentTaskIdRef.current = task.id;
         setPreviewLog(null);
         setPrompt(task.prompt);
@@ -127,7 +127,7 @@ export default function ImagePage() {
         setElapsedMs(elapsed);
         setStartedAt(performance.now() - elapsed);
         setResults(generationTaskToResults(task));
-    };
+    }, [updateConfig]);
 
     useEffect(() => {
         if (!running || !startedAt) return;
@@ -141,14 +141,6 @@ export default function ImagePage() {
         // 检查是否有活动任务，如果有则恢复 UI 状态
         const activeTask = getActiveTask();
         if (activeTask) previewGenerationTask(activeTask);
-    }, []);
-
-    useEffect(() => {
-        const handleLogsUpdated = () => {
-            void refreshLogs();
-        };
-        window.addEventListener(LOGS_UPDATED_EVENT, handleLogsUpdated);
-        return () => window.removeEventListener(LOGS_UPDATED_EVENT, handleLogsUpdated);
     }, []);
 
     // 监听当前任务的变化，实时同步到 results 状态
@@ -286,33 +278,8 @@ export default function ImagePage() {
 
             if (controller.signal.aborted) return;
 
-            const logImages = await Promise.all(
-                successImages.map(async (image) => {
-                    const stored = await uploadImage(image.dataUrl);
-                    return { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
-                }),
-            );
-            if (controller.signal.aborted) return;
-
-            // 上传完成后，更新 store 中的图片 URL 和 storageKey
-            logImages.forEach((image) => {
-                const resultIndex = successImages.findIndex(img => img.id === image.id);
-                if (resultIndex !== -1) {
-                    const originalIndex = result.findIndex((item, idx) => item.status === "fulfilled" && result.slice(0, idx + 1).filter(r => r.status === "fulfilled").length === resultIndex + 1);
-                    if (originalIndex !== -1) {
-                        updateTaskImage(createdTaskId, initialResults[originalIndex].id, {
-                            dataUrl: image.dataUrl,
-                            storageKey: image.storageKey,
-                            status: "success",
-                            width: image.width,
-                            height: image.height,
-                            bytes: image.bytes,
-                            mimeType: image.mimeType,
-                            durationMs: image.durationMs,
-                        });
-                    }
-                }
-            });
+            // runGenerationSlot 已经把图片写入 IndexedDB，这里直接复用同一份存储结果。
+            const logImages = successImages;
 
             // 保存到历史记录
             try {
@@ -344,6 +311,7 @@ export default function ImagePage() {
             message.error(error instanceof Error ? error.message : t("workbench.generationFailed"));
         }).finally(() => {
             unregister();
+            removeTask(createdTaskId);
             setRunning(false);
             currentTaskIdRef.current = undefined;
         });
@@ -415,7 +383,9 @@ export default function ImagePage() {
         setAssetPickerOpen(false);
     };
 
-    const createSession = () => {
+    const refreshLogs = useCallback(async () => setLogs(await readStoredLogs()), []);
+
+    const createSession = useCallback(() => {
         setPrompt("");
         setReferences([]);
         setResults([]);
@@ -423,9 +393,9 @@ export default function ImagePage() {
         setStartedAt(0);
         setSelectedLogIds([]);
         setPreviewLog(null);
-    };
+    }, []);
 
-    const deleteSelectedLogs = () => {
+    const deleteSelectedLogs = useCallback(() => {
         const imageKeys = logs.filter((log) => selectedLogIds.includes(log.id)).flatMap((log) => log.images.map((image) => image.storageKey).filter((key): key is string => Boolean(key)));
         void Promise.all([deleteStoredImages(imageKeys), ...selectedLogIds.map((id) => logStore.removeItem(id))]).then(refreshLogs);
         if (previewLog && selectedLogIds.includes(previewLog.id)) {
@@ -434,33 +404,35 @@ export default function ImagePage() {
         }
         setSelectedLogIds([]);
         setDeleteConfirmOpen(false);
-    };
+    }, [logs, previewLog, refreshLogs, selectedLogIds]);
+
+    const openDeleteConfirm = useCallback(() => setDeleteConfirmOpen(true), []);
 
     const saveLog = async (log: GenerationLog) => {
         try {
             await logStore.setItem(log.id, serializeLog(log));
-            window.dispatchEvent(new Event(LOGS_UPDATED_EVENT));
-            await refreshLogs();
+            const entry = normalizeLog(log);
+            setLogs((current) => [entry, ...current.filter((item) => item.id !== entry.id)]);
         } catch (error) {
             // A history write failure must not turn a successful generation into a failed one.
             console.error("Failed to save generation log:", error);
         }
     };
 
-    const refreshLogs = async () => setLogs(await readStoredLogs());
-
-    const previewGenerationLog = async (log: GenerationLog) => {
+    const previewGenerationLog = useCallback(async (log: GenerationLog) => {
         currentTaskIdRef.current = undefined;
         setPreviewLog(log);
         setLogsOpen(false);
         setPrompt(log.prompt);
-        setReferences(log.references || []);
+        const storedLog = await logStore.getItem<GenerationLog>(log.id);
+        const hydrated = await hydrateLogMedia(storedLog || log);
+        setReferences(hydrated.references || []);
         if (log.config.imageModel || log.model) updateConfig("imageModel", log.config.imageModel || log.model);
         if (log.config.quality) updateConfig("quality", log.config.quality);
         if (log.config.size) updateConfig("size", log.config.size);
         if (log.config.count) updateConfig("count", log.config.count);
-        setResults(log.images.map((image) => ({ id: image.id, status: "success", image })));
-    };
+        setResults(hydrated.images.map((image) => ({ id: image.id, status: "success", image })));
+    }, [updateConfig]);
 
     const buildRequestSnapshot = () => {
         const text = prompt.trim();
@@ -479,7 +451,7 @@ export default function ImagePage() {
     const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }, signal?: AbortSignal) => {
         const itemStartedAt = performance.now();
         try {
-            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references, undefined, { signal }) : await requestGeneration(snapshot.config, snapshot.text, { signal });
+            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references, { signal }) : await requestGeneration(snapshot.config, snapshot.text, { signal });
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
             const stored = await uploadImage(image.dataUrl);
@@ -503,10 +475,6 @@ export default function ImagePage() {
         try {
             const image = await runGenerationSlot(index, snapshot, controller.signal);
             if (controller.signal.aborted) return;
-            const stored = await uploadImage(image.dataUrl);
-            if (controller.signal.aborted) return;
-            const logImage = { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
-            setResults((value) => updateResultAt(value, index, { image: { ...image, dataUrl: stored.url, storageKey: stored.storageKey } }));
             await saveLog(
                 buildLog({
                     prompt: snapshot.text,
@@ -517,7 +485,7 @@ export default function ImagePage() {
                     successCount: 1,
                     failCount: 0,
                     status: "success",
-                    images: [logImage],
+                    images: [image],
                 }),
             );
             message.success(t("workbench.retrySuccess"));
@@ -539,9 +507,9 @@ export default function ImagePage() {
                         activeTaskId={currentTaskIdRef.current}
                         onSelectedLogIdsChange={setSelectedLogIds}
                         onCreateSession={createSession}
-                        onDeleteSelected={() => setDeleteConfirmOpen(true)}
+                        onDeleteSelected={openDeleteConfirm}
                         onPreviewTask={previewGenerationTask}
-                        onPreviewLog={(log) => void previewGenerationLog(log)}
+                        onPreviewLog={previewGenerationLog}
                     />
                 </aside>
 
@@ -703,9 +671,9 @@ export default function ImagePage() {
                     activeTaskId={currentTaskIdRef.current}
                     onSelectedLogIdsChange={setSelectedLogIds}
                     onCreateSession={createSession}
-                    onDeleteSelected={() => setDeleteConfirmOpen(true)}
+                    onDeleteSelected={openDeleteConfirm}
                     onPreviewTask={previewGenerationTask}
-                    onPreviewLog={(log) => void previewGenerationLog(log)}
+                    onPreviewLog={previewGenerationLog}
                 />
             </Drawer>
             <Drawer title={t("workbench.settings")} placement="bottom" size="82vh" open={settingsOpen} onClose={() => setSettingsOpen(false)}>
@@ -845,7 +813,7 @@ function updateResultAt(results: GenerationResult[], index: number, next: Partia
     return results.map((item, itemIndex) => (itemIndex === index ? { ...item, ...next } : item));
 }
 
-function LogPanel({
+const LogPanel = memo(function LogPanel({
     logs,
     selectedLogIds,
     activeLogId,
@@ -872,6 +840,10 @@ function LogPanel({
 
     const allSelected = Boolean(logs.length) && selectedLogIds.length === logs.length;
     const toggleAll = () => onSelectedLogIdsChange(allSelected ? [] : logs.map((log) => log.id));
+    const handleSelectedChange = useCallback(
+        (id: string, checked: boolean) => onSelectedLogIdsChange(checked ? [...selectedLogIds, id] : selectedLogIds.filter((item) => item !== id)),
+        [onSelectedLogIdsChange, selectedLogIds],
+    );
 
     return (
         <>
@@ -895,7 +867,7 @@ function LogPanel({
             <div className="space-y-3">
                 {/* 显示正在进行的任务 */}
                 {activeTasks.map((task) => (
-                    <ActiveTaskCard key={task.id} task={task} active={activeTaskId === task.id} onClick={() => onPreviewTask(task)} />
+                    <ActiveTaskCard key={task.id} task={task} active={activeTaskId === task.id} onClick={onPreviewTask} />
                 ))}
 
                 {/* 显示历史日志 */}
@@ -905,35 +877,36 @@ function LogPanel({
                         log={log}
                         selected={selectedLogIds.includes(log.id)}
                         active={activeLogId === log.id}
-                        onSelectedChange={(checked) => onSelectedLogIdsChange(checked ? [...selectedLogIds, log.id] : selectedLogIds.filter((id) => id !== log.id))}
-                        onClick={() => onPreviewLog(log)}
+                        onSelectedChange={handleSelectedChange}
+                        onClick={onPreviewLog}
                     />
                 ))}
                 {!logs.length && !activeTasks.length ? <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed border-stone-300 text-center text-sm text-stone-500 dark:border-stone-700">{t("workbench.noLogs")}</div> : null}
             </div>
         </>
     );
-}
+});
 
-function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void }) {
+const LogCard = memo(function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (id: string, checked: boolean) => void; onClick: (log: GenerationLog) => void }) {
     const { t } = useTranslation();
-    const thumbnails = (log.thumbnails || []).filter(Boolean).slice(0, 4);
+    const thumbnails = (log.images || []).slice(0, 4);
 
     return (
         <button
             type="button"
             className={`block w-full rounded-lg border p-2 text-left transition ${active ? "border-stone-900 bg-blue-50 dark:border-stone-100 dark:bg-blue-950/20" : "border-stone-200 bg-background hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900"}`}
-            onClick={onClick}
+            style={{ contentVisibility: "auto", containIntrinsicSize: "112px" }}
+            onClick={() => onClick(log)}
         >
             <div className="grid grid-cols-[minmax(128px,1fr)_auto] gap-2">
                 <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2">
-                    <Checkbox className="mt-0.5" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => onSelectedChange(event.target.checked)} />
+                    <Checkbox className="mt-0.5" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => onSelectedChange(log.id, event.target.checked)} />
                     <div className="min-w-0">
                         <div className="truncate text-sm font-semibold leading-5">{log.title}</div>
                         {thumbnails.length ? (
                             <div className="mt-2 flex gap-1 overflow-hidden">
                                 {thumbnails.map((image, index) => (
-                                    <img key={`${log.id}-${index}`} src={image} alt="" className="size-8 shrink-0 rounded-md object-cover" />
+                                    <HistoryThumbnail key={`${log.id}-${index}`} logId={log.id} imageIndex={index} storageKey={image.storageKey} alt="" />
                                 ))}
                             </div>
                         ) : null}
@@ -963,9 +936,83 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
             </div>
         </button>
     );
-}
+});
 
-function ActiveTaskCard({ task, active, onClick }: { task: GenerationTask; active: boolean; onClick: () => void }) {
+const HistoryThumbnail = memo(function HistoryThumbnail({ logId, imageIndex, storageKey, alt }: { logId: string; imageIndex: number; storageKey?: string; alt: string }) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [visible, setVisible] = useState(false);
+    const [src, setSrc] = useState("");
+
+    useEffect(() => {
+        if (visible) return;
+        const element = containerRef.current;
+        if (!element) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (!entry.isIntersecting) return;
+                setVisible(true);
+                observer.disconnect();
+            },
+            { rootMargin: "160px" },
+        );
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [storageKey, visible]);
+
+    useEffect(() => {
+        if (!visible) return;
+        let canceled = false;
+        let objectUrl = "";
+
+        const load = async () => {
+            try {
+                let blob: Blob | null | undefined;
+                if (storageKey) {
+                    blob = await getImageBlob(storageKey);
+                } else {
+                    const dataUrl = (await logStore.getItem<GenerationLog>(logId))?.images?.[imageIndex]?.dataUrl;
+                    if (!dataUrl) return;
+                    try {
+                        blob = await fetch(dataUrl).then((response) => response.blob());
+                    } catch {
+                        if (!canceled && !dataUrl.startsWith("data:")) setSrc(dataUrl);
+                        return;
+                    }
+                }
+                if (!blob || canceled) return;
+                if (typeof createImageBitmap === "function") {
+                    const bitmap = await createImageBitmap(blob);
+                    if (canceled) {
+                        bitmap.close();
+                        return;
+                    }
+                    const scale = Math.min(1, 64 / Math.max(bitmap.width, bitmap.height));
+                    const canvas = document.createElement("canvas");
+                    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+                    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                    bitmap.close();
+                    if (!canceled) setSrc(canvas.toDataURL("image/webp", 0.72));
+                    return;
+                }
+                objectUrl = URL.createObjectURL(blob);
+                if (!canceled) setSrc(objectUrl);
+            } catch {
+                return;
+            }
+        };
+
+        void load();
+        return () => {
+            canceled = true;
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+        };
+    }, [imageIndex, logId, storageKey, visible]);
+
+    return <div ref={containerRef} className="size-8 shrink-0 overflow-hidden rounded-md bg-stone-100 dark:bg-stone-800" style={{ contentVisibility: "auto", containIntrinsicSize: "32px 32px" }}>{src ? <img src={src} alt={alt} loading="lazy" decoding="async" className="size-full object-cover" /> : null}</div>;
+});
+
+const ActiveTaskCard = memo(function ActiveTaskCard({ task, active, onClick }: { task: GenerationTask; active: boolean; onClick: (task: GenerationTask) => void }) {
     const { t } = useTranslation();
     const successImages = task.images.filter((img) => img.status === "success" && img.dataUrl);
     const thumbnails = successImages.slice(0, 4).map((img) => img.dataUrl);
@@ -982,7 +1029,7 @@ function ActiveTaskCard({ task, active, onClick }: { task: GenerationTask; activ
         <button
             type="button"
             className={`block w-full rounded-lg border p-2 text-left transition ${active ? "border-blue-700 bg-blue-100 dark:border-blue-300 dark:bg-blue-900/40" : "border-blue-500 bg-blue-50 hover:bg-blue-100 dark:border-blue-400 dark:bg-blue-950/30 dark:hover:bg-blue-900/40"}`}
-            onClick={onClick}
+            onClick={() => onClick(task)}
         >
             <div className="grid grid-cols-[minmax(128px,1fr)_auto] gap-2">
                 <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2">
@@ -1024,35 +1071,25 @@ function ActiveTaskCard({ task, active, onClick }: { task: GenerationTask; activ
             </div>
         </button>
     );
-}
+});
 
 async function readStoredLogs() {
     if (typeof window === "undefined") return [];
     try {
-        const values: GenerationLog[] = [];
+        const logs: GenerationLog[] = [];
         await logStore.iterate<GenerationLog, void>((value) => {
-            values.push(value);
+            logs.push(normalizeLog(value));
         });
-        const logs = await Promise.all(values.map(normalizeLog));
         return logs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     } catch {
         return [];
     }
 }
 
-async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog> {
-    const references = await Promise.all(
-        (log.references || []).map(async (item) => ({
-            ...item,
-            dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl),
-        })),
-    );
-    const images = await Promise.all(
-        (log.images || []).map(async (item) => ({
-            ...item,
-            dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl),
-        })),
-    );
+function normalizeLog(log: Partial<GenerationLog>): GenerationLog {
+    // 历史列表只需要 storageKey 和尺寸等元数据，原图在用户打开某条记录时再加载。
+    const references = (log.references || []).map((item) => ({ ...item, dataUrl: "" }));
+    const images = (log.images || []).map((item) => ({ ...item, dataUrl: "" }));
     const config = normalizeLogConfig(log);
     return {
         id: log.id || nanoid(),
@@ -1071,8 +1108,16 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
         quality: log.quality || config.quality || "",
         status: log.status || "success",
         images,
-        thumbnails: images.map((image) => image.dataUrl).filter(Boolean),
+        thumbnails: [],
     };
+}
+
+async function hydrateLogMedia(log: GenerationLog) {
+    const [references, images] = await Promise.all([
+        Promise.all(log.references.map(async (item) => ({ ...item, dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl) }))),
+        Promise.all(log.images.map(async (item) => ({ ...item, dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl) }))),
+    ]);
+    return { ...log, references, images };
 }
 
 function serializeLog(log: GenerationLog): GenerationLog {
