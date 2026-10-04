@@ -33,7 +33,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         document.documentElement.classList.toggle("dark", dark);
-        document.documentElement.style.colorScheme = theme;
+        // The app owns its colors. `only` prevents mobile browsers that offer
+        // forced dark mode from recoloring an already themed page.
+        document.documentElement.style.colorScheme = dark ? "only dark" : "only light";
     }, [dark, theme]);
 
     useEffect(() => {

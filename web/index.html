@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="zh-CN" class="dark font-sans" style="color-scheme: dark">
+<html lang="zh-CN" class="dark font-sans" style="color-scheme: only dark">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="color-scheme" content="light dark" />
         <meta name="description" content="Alien AI Studio 多模态 AI 创作与无限画布工具" />
         <link rel="icon" href="/logo.svg" />
         <title>Alien AI Studio</title>
@@ -11,7 +12,9 @@
                 var s = JSON.parse(localStorage.getItem("infinite-canvas:theme_store") || "{}");
                 var t = s.state && s.state.theme === "light" ? "light" : "dark";
                 document.documentElement.classList.toggle("dark", t === "dark");
-                document.documentElement.style.colorScheme = t;
+                // Keep Samsung Internet/Android from applying a second automatic
+                // darkening pass on top of the app's explicit theme.
+                document.documentElement.style.colorScheme = t === "light" ? "only light" : "only dark";
             } catch (e) {}
         </script>
     </head>

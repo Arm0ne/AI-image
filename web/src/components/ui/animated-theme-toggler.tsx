@@ -134,7 +134,7 @@ export const AnimatedThemeToggler = ({ children, className, duration = 400, vari
             if (nextTheme === (isDark ? "dark" : "light")) return;
             setIsDark(nextTheme === "dark");
             document.documentElement.classList.toggle("dark", nextTheme === "dark");
-            document.documentElement.style.colorScheme = nextTheme;
+            document.documentElement.style.colorScheme = nextTheme === "dark" ? "only dark" : "only light";
             onThemeChange?.(nextTheme);
         };
 

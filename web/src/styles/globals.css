@@ -118,6 +118,15 @@
 }
 
 @layer base {
+    /* Prevent a browser's forced dark mode from recoloring the app a second time. */
+    html {
+        color-scheme: only light;
+    }
+
+    html.dark {
+        color-scheme: only dark;
+    }
+
     * {
         @apply border-border outline-ring/50;
     }

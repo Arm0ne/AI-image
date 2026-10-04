@@ -99,9 +99,9 @@ export function AppTopNav() {
         <>
             {!hideHeader ? (
                 <header className="sticky top-0 z-20 h-14 shrink-0 border-b border-stone-200 bg-background/90 backdrop-blur-xl dark:border-stone-800">
-                    <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-5 px-6">
-                        <div className="flex min-w-0 items-center">
-                            <Link to="/" className="flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight text-stone-400 transition hover:text-stone-100 dark:text-stone-400 dark:hover:text-stone-100">
+                    <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-2 px-3 sm:gap-5 sm:px-6">
+                        <div className="flex min-w-0 flex-1 items-center">
+                            <Link to="/" className="flex h-full min-w-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight text-stone-400 transition hover:text-stone-100 dark:text-stone-400 dark:hover:text-stone-100">
                                 <span
                                     className="size-5 shrink-0 bg-current"
                                     style={{
@@ -109,12 +109,12 @@ export function AppTopNav() {
                                         WebkitMask: "url(/logo.svg) center / contain no-repeat",
                                     }}
                                 />
-                                <span className="text-base font-medium">{t("meta.title")}</span>
+                                <span className="min-w-0 truncate text-base font-medium">{t("meta.title")}</span>
                             </Link>
 
                             <button
                                 type="button"
-                                className="ml-3 inline-flex size-8 shrink-0 items-center justify-center text-stone-600 transition hover:text-stone-950 md:hidden dark:text-stone-300 dark:hover:text-white"
+                                className="ml-1 inline-flex size-8 shrink-0 items-center justify-center text-stone-600 transition hover:text-stone-950 sm:ml-3 md:hidden dark:text-stone-300 dark:hover:text-white"
                                 onClick={() => setMobileNavOpen(true)}
                                 aria-label={t("topNav.openMenu")}
                                 title={t("topNav.menu")}
@@ -145,7 +145,7 @@ export function AppTopNav() {
                             </nav>
                         </div>
 
-                        <div className="my-auto flex h-9 min-w-0 items-center justify-end gap-2 justify-self-end whitespace-nowrap">
+                        <div className="my-auto flex h-9 shrink-0 items-center justify-end gap-1 whitespace-nowrap sm:gap-2">
                             {isLoggedIn && userInfo ? (
                                 <>
                                     <Dropdown
