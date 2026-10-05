@@ -1,0 +1,13 @@
+{
+  "name": "alien-ai-studio-local",
+  "version": 1,
+  "description": "Local marketplace for the Alien AI Studio ZCode plugin.",
+  "plugins": [
+    {
+      "name": "alien-ai-studio-plugin",
+      "version": "0.1.0",
+      "description": "Launch and operate Alien AI Studio through the local Agent MCP server in ZCode.",
+      "source": "."
+    }
+  ]
+}

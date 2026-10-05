@@ -4,6 +4,8 @@ Alien AI Studio 是一个面向 AI 图片、视频、音频与文本创作的多
 
 本项目基于 [basketikun/infinite-canvas](https://github.com/basketikun/infinite-canvas) 二次开发，遵循 MIT License。
 
+当前已同步上游 v0.19.0，保留 Alien AI Studio 的账号登录、渠道同步、品牌和本地 Agent。更新对比和验证范围见[同步说明](docs/upstream-sync-v0.19.0.md)。
+
 ## 仓库结构
 
 - `web/`：网站前端
@@ -37,6 +39,8 @@ codex plugin add alien-ai-studio-plugin@alien-ai-studio
 ```
 
 安装后新建 Codex 任务并输入“启动创作站”或“启动生图站”。插件会启动本地 Agent，在系统默认浏览器打开网站并自动连接右侧 Codex 面板。
+
+ZCode 可在插件管理中加载 `plugins/alien-ai-studio-plugin/` 本地目录，复用同一套网站启动与画布 MCP 工具。安装说明见[插件文档](plugins/alien-ai-studio-plugin/README.md)。
 
 ## License
 
