@@ -12,7 +12,7 @@ Alien AI Studio 已在 `update/upstream-v0.19.0` 分支整合上游 v0.19.0 及�
 
 完成前已用 `git ls-remote upstream HEAD` 核对上游仍为上述提交。该提交的 `VERSION` 为 `v0.19.0`；v0.19.0 发布后的两次提交只新增 README 赞助内容。
 
-上游源码保存在同级 `infinite-canvas-upstream` 目录，本项目也配置了 `upstream` remote。原 `custom` 分支仍保留同步前的提交。本次仅保存本地合并提交，未推送、部署或发布标签。
+上游源码保存在同级 `infinite-canvas-upstream` 目录，本项目也配置了 `upstream` remote。本次整合使用 `update/upstream-v0.19.0` 工作分支，交付到 `custom` 分支供服务器拉取；同步前的提交仍保留在 Git 历史中。源码推送、服务器部署和版本标签发布分别处理。
 
 ## 上游更新与本项目处理
 

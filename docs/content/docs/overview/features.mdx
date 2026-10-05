@@ -32,6 +32,12 @@ description: Major features available in the current project
 - Support image count, aspect ratio, quality, transparent backgrounds, reasoning effort, and custom invocation scripts.
 - Support OpenAI-style video endpoints.
 
+## Image Workbench
+
+- Start generation to create a new history record.
+- Retry a failed image within its original record, restarting the timer and retaining successful images and other failed slots.
+- Switch records or pages during a retry and return to its progress; completion updates only that record. Failed results retain their errors and can be retried after reload.
+
 ## Canvas Agent
 
 - Connect local Codex through Canvas Agent and MCP without giving a web server direct access to browser state.

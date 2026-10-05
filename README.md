@@ -10,9 +10,12 @@ Alien AI Studio 是一个面向 AI 图片、视频、音频与文本创作的多
 
 - `web/`：网站前端
 - `canvas-agent/`：发布为 `@arm0ne/alien-ai-studio-agent` 的本地 Codex Agent
+- `canvas-proxy/`：可选本地代理，供需要跨域转发的场景使用
 - `plugins/alien-ai-studio-plugin/`：Alien AI Studio Codex Plugin
 - `plugins/canvas/`：画布节点插件与 SDK
 - `docs/`：项目文档
+
+文档导航见[文档索引](docs/index.zh-CN.md)，项目结构、更新记录与本地运行方式见[源码说明](docs/reference/source-overview.md)。
 
 ## 本地开发
 

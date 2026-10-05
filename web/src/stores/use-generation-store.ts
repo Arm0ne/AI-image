@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { nanoid } from "nanoid";
 
 import type { ReferenceImage } from "@/types/image";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -12,9 +11,10 @@ export type GenerationTask = {
     model: string;
     count: number;
     references?: ReferenceImage[];
-    settings?: Pick<AiConfig, "quality" | "size">;
+    settings?: Pick<AiConfig, "quality" | "size"> & Partial<Pick<AiConfig, "background" | "systemPrompt">>;
     status: GenerationTaskStatus;
     createdAt: number;
+    startedAt?: number;
     completedAt?: number;
     successCount: number;
     failCount: number;
@@ -34,7 +34,8 @@ export type GenerationTask = {
 
 type GenerationStore = {
     tasks: GenerationTask[];
-    addTask: (task: Omit<GenerationTask, "id" | "createdAt" | "successCount" | "failCount">) => string;
+    historyRevision: number;
+    addTask: (task: GenerationTask) => boolean;
     updateTask: (id: string, patch: Partial<Omit<GenerationTask, "id" | "createdAt">>) => void;
     updateTaskImage: (taskId: string, imageId: string, patch: { status?: "pending" | "success" | "failed"; dataUrl?: string; storageKey?: string; error?: string; width?: number; height?: number; bytes?: number; mimeType?: string; durationMs?: number }) => void;
     removeTask: (id: string) => void;
@@ -44,20 +45,14 @@ type GenerationStore = {
 
 export const useGenerationStore = create<GenerationStore>((set, get) => ({
     tasks: [],
+    historyRevision: 0,
 
     addTask: (task) => {
-        const id = nanoid();
-        const newTask: GenerationTask = {
-            ...task,
-            id,
-            createdAt: Date.now(),
-            successCount: 0,
-            failCount: 0,
-        };
+        if (get().tasks.some((item) => item.id === task.id && (item.status === "pending" || item.status === "running"))) return false;
         set((state) => ({
-            tasks: [newTask, ...state.tasks],
+            tasks: [task, ...state.tasks.filter((item) => item.id !== task.id)],
         }));
-        return id;
+        return true;
     },
 
     updateTask: (id, patch) => {
@@ -82,14 +77,11 @@ export const useGenerationStore = create<GenerationStore>((set, get) => ({
                 const updatedImages = task.images.map((img) => (img.id === imageId ? { ...img, ...patch } : img));
                 const successCount = updatedImages.filter((img) => img.status === "success").length;
                 const failCount = updatedImages.filter((img) => img.status === "failed").length;
-                const allCompleted = updatedImages.every((img) => img.status === "success" || img.status === "failed");
                 return {
                     ...task,
                     images: updatedImages,
                     successCount,
                     failCount,
-                    status: allCompleted ? (successCount > 0 ? "success" : "failed") : task.status,
-                    completedAt: allCompleted ? Date.now() : task.completedAt,
                 };
             }),
         }));
@@ -98,6 +90,7 @@ export const useGenerationStore = create<GenerationStore>((set, get) => ({
     removeTask: (id) => {
         set((state) => ({
             tasks: state.tasks.filter((task) => task.id !== id),
+            historyRevision: state.historyRevision + 1,
         }));
     },
 

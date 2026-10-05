@@ -37,5 +37,15 @@
 
 ## Notes
 
+- [Source Cleanup Notes](source-cleanup.md)
+
+## Supplementary References
+
+The consolidated Chinese source overview covers the architecture, local development, upstream integration, custom behavior, and verification status.
+
+- [Source Overview](reference/source-overview.md)
+
+## Storage Notes
+
 - Canvas projects and My Assets are primarily stored in the browser. WebDAV can be configured for cross-device synchronization.
 - The AI API key is stored in the browser, which sends requests directly to OpenAI-compatible endpoints.

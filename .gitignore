@@ -8,10 +8,16 @@ data/
 *.tsbuildinfo
 .DS_Store
 .idea
-web/dist
+dist/
+web/public/plugins/
 
-**/dist
-web/public/plugins
-plugins/canvas/*/dist
-plugins/canvas/*/node_modules
-web/public/plugins
+# Local editor preferences and temporary files
+.claude/settings.local.json
+~$*
+*.swp
+*.swo
+
+# Exported builds and one-off Git patches
+infinite-canvas*-dist.tar.gz
+infinite-canvas-full.tar.gz
+/[0-9][0-9][0-9][0-9]-*.patch

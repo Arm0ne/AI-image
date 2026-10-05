@@ -7,8 +7,15 @@ docs/.source
 docs/node_modules
 docs/out
 web/.next
-web/node_modules
 web/out
+**/node_modules
+**/dist
+**/.source
+.agents
+.claude
+**/infinite-canvas*-dist.tar.gz
+**/infinite-canvas-full.tar.gz
+**/~$*
 *.log
 .env*
 !.env.example
