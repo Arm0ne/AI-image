@@ -227,6 +227,8 @@ bun run dev --port 3001
 
 以下部署命令适用于 Linux / Bash 环境，沿用本项目的 `custom` 分支和 `deploy.sh`。服务器需要已安装 Git、Bash 和 Docker，Docker 服务已启动，当前用户有运行 Docker 的权限。前端依赖安装和编译在 Docker 构建中完成，服务器无需单独安装 Node.js 或 Bun。
 
+主应用 Dockerfile 使用 `oven/bun:1.3.13` 构建前端，使用 `nginx:1.30.5-alpine` 运行静态站点。
+
 先进入自己希望存放源码的位置，再执行：
 
 ```bash

@@ -7,6 +7,7 @@ description: Implemented changes that still need manual verification
 
 The current release needs manual verification in these areas:
 
+- Docker runtime upgrade: build and deploy the main application with `nginx:1.30.5-alpine`; verify container startup, static assets, direct navigation and refresh on `/image` and `/canvas`, and successful responses for `config.js` and `version.json`.
 - Upstream v0.19.0 integration: verify canvas images, expanded image groups, element lists, reference bars, asset cards and workbench results use local WebP previews, while zoomed previews, downloads, exports, generation inputs and WebDAV still use originals. Existing canvases/assets/history must remain readable without resetting browser storage. Image history should remain lazy and reuse cached previews only when cards approach the viewport; legacy inline images should still display.
 - Preview lifecycle: request a preview for the same image from several components and verify it is generated once; delete an image while its preview is queued and verify no orphan preview remains; cancel generation during thumbnail creation and verify neither the original nor the preview is retained. Preview failures must fall back to original images.
 - Canvas performance and controls: drag individual nodes, selections and groups, including into and out of groups; verify final positions and undo/redo. Pan and zoom through connections whose endpoints are offscreen. Hover controls should remain usable with keyboard focus and on touch screens.
