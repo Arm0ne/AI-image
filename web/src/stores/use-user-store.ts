@@ -13,8 +13,10 @@ type UserStore = {
     userInfo: UserInfo | null;
     accessToken: string | null;
     isLoggedIn: boolean;
+    modelCatalogLastSyncedAt: number | null;
     setUserInfo: (userInfo: UserInfo) => void;
     setAccessToken: (token: string) => void;
+    setModelCatalogLastSyncedAt: (value: number) => void;
     clearUserInfo: () => void;
 };
 
@@ -24,6 +26,7 @@ export const useUserStore = create<UserStore>()(
             userInfo: null,
             accessToken: null,
             isLoggedIn: false,
+            modelCatalogLastSyncedAt: null,
             setUserInfo: (userInfo) =>
                 set({
                     userInfo,
@@ -33,11 +36,13 @@ export const useUserStore = create<UserStore>()(
                 set({
                     accessToken: token,
                 }),
+            setModelCatalogLastSyncedAt: (value) => set({ modelCatalogLastSyncedAt: value }),
             clearUserInfo: () =>
                 set({
                     userInfo: null,
                     accessToken: null,
                     isLoggedIn: false,
+                    modelCatalogLastSyncedAt: null,
                 }),
         }),
         {

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { App, Modal, Form, Input, Button, Alert } from "antd";
 import { useTranslation } from "react-i18next";
-import { SUB2API_URL, syncChannelsFromSub2Api } from "@/services/sub2api-sync";
-import { modelOptionsFromChannels, preferredImageModelFromChannels, useConfigStore } from "@/stores/use-config-store";
+import { SUB2API_URL, Sub2ApiAuthenticationError, syncChannelsFromSub2Api } from "@/services/sub2api-sync";
+import { applySyncedChannels, useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 type Sub2ApiLoginModalProps = {
@@ -21,9 +21,12 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
     const { message } = App.useApp();
     const [form] = Form.useForm<FormValues>();
     const [loading, setLoading] = useState(false);
-    const updateConfig = useConfigStore((state) => state.updateConfig);
+    const replaceConfig = useConfigStore((state) => state.replaceConfig);
     const setUserInfo = useUserStore((state) => state.setUserInfo);
     const setAccessToken = useUserStore((state) => state.setAccessToken);
+    const setModelCatalogLastSyncedAt = useUserStore((state) => state.setModelCatalogLastSyncedAt);
+    const clearUserInfo = useUserStore((state) => state.clearUserInfo);
+    const clearAiCredentials = useConfigStore((state) => state.clearAiCredentials);
 
     const handleSync = async (values: FormValues) => {
         setLoading(true);
@@ -39,21 +42,21 @@ export function Sub2ApiLoginModal({ open, onClose }: Sub2ApiLoginModalProps) {
             setUserInfo(userInfo);
             setAccessToken(accessToken);
 
-            // 完全替换现有渠道配置
-            updateConfig("channels", channels);
-            updateConfig("models", modelOptionsFromChannels(channels));
-
-            // 登录同步后优先使用 Image2；没有 Image2 时才回退到第一个图片模型。
-            const preferredImageModel = preferredImageModelFromChannels(channels);
-            if (preferredImageModel) {
-                updateConfig("imageModel", preferredImageModel);
-                updateConfig("model", preferredImageModel);
-            }
+            // 登录同步后优先使用 gpt-image-2.5；没有时回退到 Image2 或第一个图片模型。
+            const nextConfig = applySyncedChannels(useConfigStore.getState().config, channels, false);
+            replaceConfig(nextConfig);
+            setModelCatalogLastSyncedAt(Date.now());
 
             message.success(`成功同步 ${channels.length} 个生图组渠道`);
             form.resetFields();
             onClose();
         } catch (error) {
+            if (error instanceof Sub2ApiAuthenticationError) {
+                clearAiCredentials();
+                clearUserInfo();
+                message.error(error.message);
+                return;
+            }
             const errorMessage = error instanceof Error ? error.message : "同步失败";
             message.error(errorMessage);
         } finally {

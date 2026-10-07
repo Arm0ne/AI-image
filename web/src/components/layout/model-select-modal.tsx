@@ -6,8 +6,10 @@ import { useTranslation } from "react-i18next";
 import { fetchChannelModels } from "@/services/api/image";
 import type { ModelChannel } from "@/stores/use-config-store";
 
+type SelectedModel = { name: string; source: "remote" | "manual" };
+
 // Channel model selector: fetch upstream models or add them manually, then include checked models in the channel list.
-export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onClose }: { open: boolean; channel: ModelChannel | null; selectedNames: string[]; onConfirm: (names: string[]) => void; onClose: () => void }) {
+export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onClose }: { open: boolean; channel: ModelChannel | null; selectedNames: string[]; onConfirm: (models: SelectedModel[]) => void; onClose: () => void }) {
     const { message } = App.useApp();
     const { t } = useTranslation();
     const [existing, setExisting] = useState<string[]>([]);
@@ -16,6 +18,7 @@ export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onCl
     const [activeTab, setActiveTab] = useState("new");
     const [search, setSearch] = useState("");
     const [manual, setManual] = useState("");
+    const [manualNames, setManualNames] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -26,6 +29,7 @@ export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onCl
         setActiveTab(selectedNames.length ? "existing" : "new");
         setSearch("");
         setManual("");
+        setManualNames(new Set());
     }, [open, selectedNames]);
 
     const currentList = activeTab === "new" ? fetched : existing;
@@ -54,6 +58,7 @@ export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onCl
         const name = manual.trim();
         if (!name) return;
         if (!fetched.includes(name) && !existing.includes(name)) setFetched((current) => [name, ...current]);
+        setManualNames((current) => new Set(current).add(name));
         setSelected((current) => new Set(current).add(name));
         setManual("");
         setActiveTab("new");
@@ -80,7 +85,7 @@ export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onCl
 
     const confirm = () => {
         const ordered = [...existing, ...fetched].filter((name, index, list) => list.indexOf(name) === index).filter((name) => selected.has(name));
-        onConfirm(ordered);
+        onConfirm(ordered.map((name) => ({ name, source: manualNames.has(name) ? "manual" : "remote" })));
         onClose();
     };
 

@@ -15,10 +15,13 @@ export type ChannelModel = {
     name: string;
     capability: ModelCapability;
     script?: string;
+    source?: "remote" | "manual";
 };
 
 export type ModelChannel = {
     id: string;
+    /** Stable identity for channels fetched from the account service. */
+    syncKey?: string;
     name: string;
     baseUrl: string;
     apiKey: string;
@@ -105,7 +108,7 @@ export const defaultConfig: AiConfig = {
     videoMode: "frames",
     systemPrompt: "",
     reasoningEffort: "auto",
-    models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
+    models: ["default::gpt-image-2.5", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
     quality: "auto",
     size: "1:1",
     background: "",
@@ -131,6 +134,7 @@ type ConfigStore = {
     configTab: ConfigTabKey;
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
+    replaceConfig: (config: AiConfig) => void;
     clearAiCredentials: () => void;
     importChannelCredentials: (input: { baseUrl?: string | null; apiKey?: string | null }) => ChannelCredentialsImportResult;
     updateWebdavConfig: <K extends keyof WebdavSyncConfig>(key: K, value: WebdavSyncConfig[K]) => void;
@@ -212,6 +216,7 @@ export const useConfigStore = create<ConfigStore>()(
                         [key]: value,
                     },
                 })),
+            replaceConfig: (config) => set({ config }),
             clearAiCredentials: () => {
                 cancelAiRequests();
                 set((state) => ({
@@ -319,7 +324,8 @@ export function normalizeChannelModels(models: Array<string | ChannelModel> | un
         seen.add(name);
         const capability = typeof item === "string" ? guessCapability(name) : item.capability || guessCapability(name);
         const script = typeof item === "string" ? undefined : item.script?.trim() || undefined;
-        result.push({ name, capability, script });
+        const source = typeof item === "string" ? undefined : item.source;
+        result.push({ name, capability, script, source });
     }
     return result;
 }
@@ -328,6 +334,7 @@ export function createModelChannel(channel?: Partial<ModelChannel>): ModelChanne
     const apiFormat = normalizeApiFormat(channel?.apiFormat);
     return {
         id: channel?.id?.trim() || nanoid(),
+        syncKey: channel?.syncKey?.trim() || undefined,
         name: channel?.name?.trim() || i18n.t("config.channels.newName"),
         baseUrl: channel?.baseUrl?.trim() || defaultBaseUrlForApiFormat(apiFormat),
         apiKey: channel?.apiKey || "",
@@ -435,7 +442,85 @@ export function preferredImageModelFromChannels(channels: ModelChannel[]) {
             .filter((model) => model.capability === "image")
             .map((model) => ({ value: encodeChannelModel(channel.id, model.name), normalizedName: model.name.toLowerCase().replace(/[^a-z0-9]/g, "") })),
     );
-    return imageModels.find((model) => model.normalizedName.includes("image2"))?.value || imageModels[0]?.value || "";
+    return imageModels.find((model) => model.normalizedName.includes("image25"))?.value
+        || imageModels.find((model) => model.normalizedName.includes("image2"))?.value
+        || imageModels[0]?.value
+        || "";
+}
+
+function normalizedModelName(value: string) {
+    return modelOptionName(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function isLegacyDefaultImageModel(value: string) {
+    return normalizedModelName(value) === "gptimage2";
+}
+
+function sameChannelForSync(current: ModelChannel, incoming: ModelChannel) {
+    if (current.syncKey && incoming.syncKey && current.syncKey === incoming.syncKey) return true;
+    const currentBaseUrl = current.baseUrl.trim().replace(/\/+$/, "").toLowerCase();
+    const incomingBaseUrl = incoming.baseUrl.trim().replace(/\/+$/, "").toLowerCase();
+    return currentBaseUrl === incomingBaseUrl && current.apiKey === incoming.apiKey;
+}
+
+function mergeSyncedChannelModels(current: ModelChannel, incoming: ModelChannel) {
+    const currentByName = new Map(current.models.map((model) => [model.name, model]));
+    const models = incoming.models.map((model) => {
+        const previous = currentByName.get(model.name);
+        return previous
+            ? { ...model, capability: previous.capability, script: previous.script, source: previous.source || (current.syncKey ? "remote" : model.source) }
+            : model;
+    });
+    for (const model of current.models) {
+        if (!incoming.models.some((item) => item.name === model.name) && (!current.syncKey || model.source === "manual")) {
+            models.push({ ...model, source: model.source || "manual" });
+        }
+    }
+    return normalizeChannelModels(models);
+}
+
+/** Merge a fresh account-service catalog without changing channel IDs or local model settings. */
+export function mergeSyncedChannels(current: ModelChannel[], incoming: ModelChannel[]) {
+    const matchedCurrent = new Set<number>();
+    const channels = incoming.map((nextChannel) => {
+        const currentIndex = current.findIndex((channel, index) => !matchedCurrent.has(index) && sameChannelForSync(channel, nextChannel));
+        if (currentIndex < 0) return nextChannel;
+        matchedCurrent.add(currentIndex);
+        const previous = current[currentIndex];
+        return {
+            ...nextChannel,
+            id: previous.id,
+            syncKey: nextChannel.syncKey || previous.syncKey,
+            models: mergeSyncedChannelModels(previous, nextChannel),
+        };
+    });
+    return [...channels, ...current.filter((channel, index) => !matchedCurrent.has(index) && !channel.syncKey)];
+}
+
+/** Apply synchronized channels while keeping the selected model unless it is the old default. */
+export function applySyncedChannels(config: AiConfig, incoming: ModelChannel[], preserveExisting = true) {
+    const channels = preserveExisting ? mergeSyncedChannels(config.channels, incoming) : incoming;
+    const models = modelOptionsFromChannels(channels);
+    const previousImageModel = config.imageModel || (!config.model || isLegacyDefaultImageModel(config.model) ? config.model : "");
+    const currentImageModel = normalizeModelOptionValue(previousImageModel, channels);
+    const preferredImageModel = preferredImageModelFromChannels(channels);
+    const currentModelConfig = { ...config, channels };
+    const currentSelectionIsImage = Boolean(currentImageModel && modelCapabilityOf(currentModelConfig, currentImageModel) === "image");
+    const shouldUpgradeDefault = !currentSelectionIsImage || isLegacyDefaultImageModel(currentImageModel);
+    const imageModel = shouldUpgradeDefault ? preferredImageModel : currentImageModel;
+    const genericMirrorsImage = !config.model
+        || isLegacyDefaultImageModel(config.model)
+        || (Boolean(config.imageModel) && normalizedModelName(config.model) === normalizedModelName(config.imageModel));
+    return {
+        ...config,
+        channels,
+        models,
+        baseUrl: channels[0]?.baseUrl || config.baseUrl,
+        apiKey: channels[0]?.apiKey || config.apiKey,
+        apiFormat: channels[0]?.apiFormat || config.apiFormat,
+        imageModel,
+        model: genericMirrorsImage ? imageModel : config.model,
+    };
 }
 
 export function normalizeModelOptionValue(value: string | undefined, channels: ModelChannel[]) {

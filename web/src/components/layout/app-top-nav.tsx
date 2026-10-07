@@ -10,10 +10,13 @@ import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { Sub2ApiLoginModal } from "@/components/layout/sub2api-login-modal";
 import { useUserStore } from "@/stores/use-user-store";
 import { cn } from "@/lib/utils";
-import { fetchUserInfo, SUB2API_URL, USER_INFO_REFRESH_EVENT } from "@/services/sub2api-sync";
+import { fetchUserInfo, SUB2API_URL, Sub2ApiAuthenticationError, syncChannelsWithToken, USER_INFO_REFRESH_EVENT } from "@/services/sub2api-sync";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAgentStore } from "@/stores/use-agent-store";
-import { useConfigStore } from "@/stores/use-config-store";
+import { applySyncedChannels, useConfigStore } from "@/stores/use-config-store";
+
+const MODEL_CATALOG_SYNC_INTERVAL = 24 * 60 * 60 * 1000;
+const MODEL_CATALOG_RETRY_INTERVAL = 5 * 60 * 1000;
 
 export function AppTopNav() {
     const { t } = useTranslation();
@@ -35,10 +38,14 @@ export function AppTopNav() {
     const userInfo = useUserStore((state) => state.userInfo);
     const isLoggedIn = useUserStore((state) => state.isLoggedIn);
     const accessToken = useUserStore((state) => state.accessToken);
+    const modelCatalogLastSyncedAt = useUserStore((state) => state.modelCatalogLastSyncedAt);
     const clearUserInfo = useUserStore((state) => state.clearUserInfo);
     const setUserInfo = useUserStore((state) => state.setUserInfo);
+    const setModelCatalogLastSyncedAt = useUserStore((state) => state.setModelCatalogLastSyncedAt);
     const clearAiCredentials = useConfigStore((state) => state.clearAiCredentials);
     const balanceRefreshRef = useRef<{ token: string; promise: Promise<void> } | null>(null);
+    const modelSyncRef = useRef<{ token: string; promise: Promise<void> } | null>(null);
+    const modelSyncAttemptRef = useRef<{ token: string; at: number } | null>(null);
 
     const handleLogout = () => {
         clearAiCredentials();
@@ -88,6 +95,56 @@ export function AppTopNav() {
             document.removeEventListener("visibilitychange", refreshWhenVisible);
         };
     }, [accessToken, isLoggedIn, refreshUserBalance]);
+
+    const refreshModelCatalog = useCallback(async () => {
+        const current = useUserStore.getState();
+        if (!current.isLoggedIn || !current.accessToken) return;
+
+        const now = Date.now();
+        const tokenAtStart = current.accessToken;
+        if (now - (current.modelCatalogLastSyncedAt || 0) < MODEL_CATALOG_SYNC_INTERVAL) return;
+        if (modelSyncAttemptRef.current?.token === tokenAtStart && now - modelSyncAttemptRef.current.at < MODEL_CATALOG_RETRY_INTERVAL) return;
+        if (modelSyncRef.current?.token === tokenAtStart) return modelSyncRef.current.promise;
+
+        modelSyncAttemptRef.current = { token: tokenAtStart, at: now };
+        const request = syncChannelsWithToken(SUB2API_URL, tokenAtStart)
+            .then(({ channels, userInfo: updatedUserInfo }) => {
+                const latest = useUserStore.getState();
+                if (!latest.isLoggedIn || latest.accessToken !== tokenAtStart) return;
+
+                const configStore = useConfigStore.getState();
+                configStore.replaceConfig(applySyncedChannels(configStore.config, channels));
+                setUserInfo({ ...latest.userInfo, ...updatedUserInfo });
+                setModelCatalogLastSyncedAt(Date.now());
+            })
+            .catch((error) => {
+                // Keep the cached catalog when the background refresh fails.
+                console.warn("后台同步图片模型失败:", error);
+                if (error instanceof Sub2ApiAuthenticationError) {
+                    useConfigStore.getState().clearAiCredentials();
+                    useUserStore.getState().clearUserInfo();
+                }
+            });
+        modelSyncRef.current = { token: tokenAtStart, promise: request };
+        void request.finally(() => {
+            if (modelSyncRef.current?.promise === request) modelSyncRef.current = null;
+        });
+        return request;
+    }, [setModelCatalogLastSyncedAt, setUserInfo]);
+
+    useEffect(() => {
+        if (!isLoggedIn || !accessToken) return;
+        const refreshWhenVisible = () => {
+            if (document.visibilityState === "visible") void refreshModelCatalog();
+        };
+        void refreshModelCatalog();
+        window.addEventListener("focus", refreshWhenVisible);
+        document.addEventListener("visibilitychange", refreshWhenVisible);
+        return () => {
+            window.removeEventListener("focus", refreshWhenVisible);
+            document.removeEventListener("visibilitychange", refreshWhenVisible);
+        };
+    }, [accessToken, isLoggedIn, modelCatalogLastSyncedAt, pathname, refreshModelCatalog]);
 
     useEffect(() => {
         if (autoConnectRef.current || agentEnabled || agentConnected || !agentToken.trim()) return;

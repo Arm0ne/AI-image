@@ -14,9 +14,9 @@ import { exportAppConfig, importAppConfig } from "@/services/config-file";
 import { syncAppDataToWebdav, type AppSyncDomainKey, type AppSyncProgressEvent } from "@/services/app-sync";
 import { testWebdavConnection, WEBDAV_MANIFEST_FILE_NAME } from "@/services/webdav-sync";
 import { audioFormatOptions, audioVoiceOptions, normalizeAudioSpeedValue } from "@/lib/audio-generation";
-import { createModelChannel, modelOptionsFromChannels, normalizeModelOptionValue, preferredImageModelFromChannels, selectableModelsByCapability, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
+import { applySyncedChannels, createModelChannel, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
-import { SUB2API_URL, syncChannelsFromSub2Api, syncChannelsWithToken } from "@/services/sub2api-sync";
+import { SUB2API_URL, Sub2ApiAuthenticationError, syncChannelsFromSub2Api, syncChannelsWithToken } from "@/services/sub2api-sync";
 
 type ModelGroup = {
     capability: ModelCapability;
@@ -64,6 +64,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     const config = useConfigStore((state) => state.config);
     const webdav = useConfigStore((state) => state.webdav);
     const updateConfig = useConfigStore((state) => state.updateConfig);
+    const replaceConfig = useConfigStore((state) => state.replaceConfig);
     const updateWebdavConfig = useConfigStore((state) => state.updateWebdavConfig);
     const shouldPromptContinue = useConfigStore((state) => state.shouldPromptContinue);
     const setConfigDialogOpen = useConfigStore((state) => state.setConfigDialogOpen);
@@ -72,6 +73,9 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     const isLoggedIn = useUserStore((state) => state.isLoggedIn);
     const accessToken = useUserStore((state) => state.accessToken);
     const setUserInfo = useUserStore((state) => state.setUserInfo);
+    const setModelCatalogLastSyncedAt = useUserStore((state) => state.setModelCatalogLastSyncedAt);
+    const clearUserInfo = useUserStore((state) => state.clearUserInfo);
+    const clearAiCredentials = useConfigStore((state) => state.clearAiCredentials);
     const webdavReady = Boolean(webdav.url.trim());
     const editingChannel = config.channels.find((channel) => channel.id === editingChannelId) || null;
     const locale = i18n.resolvedLanguage as AppLocale;
@@ -134,20 +138,18 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
             // 更新用户信息
             setUserInfo(updatedUserInfo);
 
-            // 完全替换现有渠道配置
-            updateConfig("channels", channels);
-            updateConfig("models", modelOptionsFromChannels(channels));
-            const preferredImageModel = preferredImageModelFromChannels(channels);
-            if (preferredImageModel) {
-                updateConfig("imageModel", preferredImageModel);
-                updateConfig("model", preferredImageModel);
-            }
+            const nextConfig = applySyncedChannels(useConfigStore.getState().config, channels, true);
+            replaceConfig(nextConfig);
+            setModelCatalogLastSyncedAt(Date.now());
 
             message.success(`成功同步 ${channels.length} 个生图组渠道`);
         } catch (error) {
-            // 如果同步失败（可能是 token 过期），提示重新登录
             message.error(error instanceof Error ? error.message : "同步失败，请重新登录");
-            setSub2apiLoginOpen(true);
+            if (error instanceof Sub2ApiAuthenticationError) {
+                clearAiCredentials();
+                clearUserInfo();
+                setSub2apiLoginOpen(true);
+            }
         } finally {
             setSyncingChannels(false);
         }

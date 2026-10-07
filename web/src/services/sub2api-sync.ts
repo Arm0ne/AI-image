@@ -84,6 +84,13 @@ export type Sub2ApiModelsResponse = {
     available_balance?: number;
 };
 
+export class Sub2ApiAuthenticationError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "Sub2ApiAuthenticationError";
+    }
+}
+
 /**
  * 登录 Sub2API
  */
@@ -137,6 +144,9 @@ export async function fetchUserInfo(sub2apiUrl: string, accessToken: string, opt
         return response.data.data;
     } catch (error) {
         if (axios.isAxiosError(error)) {
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                throw new Sub2ApiAuthenticationError("登录状态已失效，请重新登录");
+            }
             const message = error.response?.data?.message || error.message;
             console.error("获取用户信息失败:", error.response?.data);
             throw new Error(`获取用户信息失败: ${message}`);
@@ -169,6 +179,9 @@ export async function fetchSub2ApiKeys(sub2apiUrl: string, accessToken: string):
         return response.data.data.items;
     } catch (error) {
         if (axios.isAxiosError(error)) {
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                throw new Sub2ApiAuthenticationError("登录状态已失效，请重新登录");
+            }
             const message = error.response?.data?.message || error.message;
             throw new Error(`获取 API Keys 失败: ${message}`);
         }
@@ -209,7 +222,7 @@ export function mapPlatformToApiFormat(platform: string): ApiCallFormat {
 /**
  * 从 Sub2API 拉取指定 API Key 的模型列表
  */
-export async function fetchModelsFromSub2Api(sub2apiUrl: string, apiKey: string): Promise<{ models: string[]; balance?: number }> {
+export async function fetchModelsFromSub2Api(sub2apiUrl: string, apiKey: string): Promise<{ models: string[]; balance?: number; success: boolean }> {
     const baseUrl = resolveApiBaseUrl(sub2apiUrl);
     const url = `${baseUrl}/v1/models`;
     try {
@@ -222,7 +235,7 @@ export async function fetchModelsFromSub2Api(sub2apiUrl: string, apiKey: string)
         console.log("Models API 完整响应:", response.data);
 
         if (!response.data?.data || !Array.isArray(response.data.data)) {
-            return { models: [], balance: undefined };
+            return { models: [], balance: undefined, success: false };
         }
 
         const models = response.data.data.map((model) => model.id).filter(Boolean);
@@ -231,11 +244,11 @@ export async function fetchModelsFromSub2Api(sub2apiUrl: string, apiKey: string)
 
         console.log("提取的余额:", balance);
 
-        return { models, balance };
+        return { models, balance, success: models.length > 0 };
     } catch (error) {
         console.error("拉取模型列表失败:", error);
-        // 拉取失败不抛出错误，返回空数组
-        return { models: [], balance: undefined };
+        // 返回失败标记，由上层保留已有模型配置，避免短暂网络错误清空列表。
+        return { models: [], balance: undefined, success: false };
     }
 }
 
@@ -262,14 +275,16 @@ export async function syncChannelsFromSub2Api(request: Sub2ApiLoginRequest): Pro
             const apiFormat = mapPlatformToApiFormat(key.group.platform);
 
             // 拉取该 Key 的模型列表
-            const { models } = await fetchModelsFromSub2Api(request.sub2apiUrl, key.key);
+            const { models, success } = await fetchModelsFromSub2Api(request.sub2apiUrl, key.key);
+            if (!success) throw new Error(`拉取渠道「${key.group.name}」模型失败`);
 
             return createModelChannel({
+                syncKey: `sub2api-key:${key.id}`,
                 name: key.group.name, // 使用 group 名称作为渠道名称
                 baseUrl: request.sub2apiUrl,
                 apiKey: key.key,
                 apiFormat,
-                models: normalizeChannelModels(models.map(name => ({ name, capability: "image" }))),
+                models: normalizeChannelModels(models.map(name => ({ name, capability: "image", source: "remote" as const }))),
             });
         })
     );
@@ -282,7 +297,20 @@ export async function syncChannelsFromSub2Api(request: Sub2ApiLoginRequest): Pro
 /**
  * 使用已保存的 access token 同步渠道配置（无需密码）
  */
-export async function syncChannelsWithToken(sub2apiUrl: string, accessToken: string): Promise<{ channels: ModelChannel[]; userInfo: Sub2ApiUserInfo }> {
+const channelSyncRequests = new Map<string, Promise<{ channels: ModelChannel[]; userInfo: Sub2ApiUserInfo }>>();
+
+export function syncChannelsWithToken(sub2apiUrl: string, accessToken: string): Promise<{ channels: ModelChannel[]; userInfo: Sub2ApiUserInfo }> {
+    const requestKey = `${sub2apiUrl}\u0000${accessToken}`;
+    const existing = channelSyncRequests.get(requestKey);
+    if (existing) return existing;
+    const request = syncChannelsWithTokenInternal(sub2apiUrl, accessToken).finally(() => {
+        if (channelSyncRequests.get(requestKey) === request) channelSyncRequests.delete(requestKey);
+    });
+    channelSyncRequests.set(requestKey, request);
+    return request;
+}
+
+async function syncChannelsWithTokenInternal(sub2apiUrl: string, accessToken: string): Promise<{ channels: ModelChannel[]; userInfo: Sub2ApiUserInfo }> {
     // 1. 获取用户信息（包含余额）
     const userInfo = await fetchUserInfo(sub2apiUrl, accessToken);
 
@@ -302,14 +330,16 @@ export async function syncChannelsWithToken(sub2apiUrl: string, accessToken: str
             const apiFormat = mapPlatformToApiFormat(key.group.platform);
 
             // 拉取该 Key 的模型列表
-            const { models } = await fetchModelsFromSub2Api(sub2apiUrl, key.key);
+            const { models, success } = await fetchModelsFromSub2Api(sub2apiUrl, key.key);
+            if (!success) throw new Error(`拉取渠道「${key.group.name}」模型失败`);
 
             return createModelChannel({
+                syncKey: `sub2api-key:${key.id}`,
                 name: key.group.name, // 使用 group 名称作为渠道名称
                 baseUrl: sub2apiUrl,
                 apiKey: key.key,
                 apiFormat,
-                models: normalizeChannelModels(models.map(name => ({ name, capability: "image" }))),
+                models: normalizeChannelModels(models.map(name => ({ name, capability: "image", source: "remote" as const }))),
             });
         })
     );

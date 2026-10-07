@@ -36,9 +36,9 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
         patch({ apiFormat, baseUrl });
     };
 
-    const applySelection = (names: string[]) => {
+    const applySelection = (entries: Array<{ name: string; source: "remote" | "manual" }>) => {
         const map = new Map(draft.models.map((model) => [model.name, model]));
-        setModels(names.map((name) => map.get(name) || { name, capability: guessCapability(name) }));
+        setModels(entries.map(({ name, source }) => map.get(name) || { name, capability: guessCapability(name), source }));
     };
 
     const setCapability = (name: string, capability: ModelCapability) => setModels(draft.models.map((model) => (model.name === name ? { ...model, capability } : model)));
