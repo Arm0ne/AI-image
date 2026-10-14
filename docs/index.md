@@ -44,6 +44,7 @@
 The consolidated Chinese source overview covers the architecture, local development, upstream integration, custom behavior, and verification status.
 
 - [Source Overview](reference/source-overview.md)
+- [生图请求异常排查记录](reference/image-request-investigation.md)
 
 ## Storage Notes
 

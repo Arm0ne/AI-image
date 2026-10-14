@@ -223,6 +223,99 @@ bun run dev --port 3001
 
 ## 9. 首次安装、日常更新与构建
 
+### 9.0 服务器部署命令总览
+
+以下是最常用的服务器命令。源码部署目录可以自行选择，不要求使用固定目录名；只有当前终端不在项目根目录时，才需要执行第一行 cd。
+
+首次安装：
+
+~~~bash
+sudo apt update
+sudo apt install -y git ca-certificates curl
+curl -fsSL https://get.docker.com | sh
+sudo systemctl enable --now docker
+
+mkdir -p ~/projects
+cd ~/projects
+git clone --branch custom --single-branch https://github.com/Arm0ne/AI-image.git AI-image
+cd AI-image
+chmod +x deploy.sh
+./deploy.sh
+~~~
+
+如果服务器已经安装 Git 和 Docker，跳过对应的安装命令即可。首次部署后检查：
+
+~~~bash
+docker ps --filter name=infinite-canvas
+docker port infinite-canvas
+curl -I http://127.0.0.1:3000
+~~~
+
+正常的端口映射应包含 127.0.0.1:3000。主应用端口只绑定服务器本机，外部访问应由反向代理转发到 http://127.0.0.1:3000。
+
+后续更新：
+
+~~~bash
+cd /你的实际项目目录
+git checkout custom
+git pull --ff-only origin custom
+chmod +x deploy.sh
+./deploy.sh
+~~~
+
+例如项目位于 ~/projects/AI-image：
+
+~~~bash
+cd ~/projects/AI-image
+git checkout custom
+git pull --ff-only origin custom
+./deploy.sh
+~~~
+
+deploy.sh 会重新构建镜像并重新创建容器，所以 Docker 配置和 127.0.0.1 端口绑定都会应用。单独执行 docker restart 不会更新代码、镜像或端口映射。
+
+如果拉取时提示本地文件有修改，先查看并保留改动：
+
+~~~bash
+git status --short
+git diff -- deploy.sh
+cp deploy.sh deploy.sh.server-backup
+git stash push -m "server local changes before update" -- deploy.sh
+git pull --ff-only origin custom
+./deploy.sh
+~~~
+
+新的远端脚本已经包含 127.0.0.1:3000:3000。确认旧备份和暂存内容不再需要后再删除：
+
+~~~bash
+rm -f deploy.sh.server-backup
+git stash list
+git stash drop stash@{0}
+~~~
+
+不要未经检查执行 git stash pop，否则可能把旧配置重新覆盖到新脚本。需要完全丢弃本地修改时，先确认备份可用，再执行 git restore -- deploy.sh。
+
+查看日志和端口：
+
+~~~bash
+docker logs --tail 100 infinite-canvas
+docker logs -f infinite-canvas
+ss -lntp | grep ':3000'
+docker ps --format 'table {{.Names}}\t{{.Ports}}'
+~~~
+
+回滚到已经确认可用的提交：
+
+~~~bash
+git status --short
+git log --oneline --decorate -10
+git checkout custom
+git reset --hard <已确认可用的提交号>
+./deploy.sh
+~~~
+
+回滚命令会丢弃未保存的服务器修改；执行前应先备份或使用 git stash -u。
+
 ### 9.1 首次安装部署
 
 以下部署命令适用于 Linux / Bash 环境，沿用本项目的 `custom` 分支和 `deploy.sh`。服务器需要已安装 Git、Bash 和 Docker，Docker 服务已启动，当前用户有运行 Docker 的权限。前端依赖安装和编译在 Docker 构建中完成，服务器无需单独安装 Node.js 或 Bun。

@@ -78,17 +78,17 @@ export type ChannelCredentialsImportResult = {
 
 export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
 const CHANNEL_MODEL_SEPARATOR = "::";
-const OPENAI_BASE_URL = "https://api.panlai.me";
-const GEMINI_BASE_URL = "https://api.panlai.me";
-const GROK_BASE_URL = "https://api.panlai.me";
-const SEEDANCE_BASE_URL = "https://api.panlai.me";
-const PANLAI_API_ORIGIN = "https://api.panlai.me";
+const OPENAI_BASE_URL = "https://server.panlai.me";
+const GEMINI_BASE_URL = "https://server.panlai.me";
+const GROK_BASE_URL = "https://server.panlai.me";
+const SEEDANCE_BASE_URL = "https://server.panlai.me";
+const PANLAI_API_ORIGIN = "https://server.panlai.me";
 export const LOCAL_PROXY_PACKAGE = "@basketikun/canvas-proxy";
 export const DEFAULT_LOCAL_PROXY_URL = "http://127.0.0.1:23210";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
-    baseUrl: "https://api.panlai.me",
+    baseUrl: "https://server.panlai.me",
     apiKey: "",
     apiFormat: "openai",
     channels: [],
@@ -280,6 +280,7 @@ export const useConfigStore = create<ConfigStore>()(
                     webdav: { ...defaultWebdavSyncConfig, ...persistedWebdav },
                     config: {
                         ...config,
+                        baseUrl: updateDefaultApiBaseUrl(config.baseUrl),
                         channelMode: "local",
                         apiFormat: normalizeApiFormat(config.apiFormat),
                         channels,
@@ -336,7 +337,7 @@ export function createModelChannel(channel?: Partial<ModelChannel>): ModelChanne
         id: channel?.id?.trim() || nanoid(),
         syncKey: channel?.syncKey?.trim() || undefined,
         name: channel?.name?.trim() || i18n.t("config.channels.newName"),
-        baseUrl: channel?.baseUrl?.trim() || defaultBaseUrlForApiFormat(apiFormat),
+        baseUrl: updateDefaultApiBaseUrl(channel?.baseUrl?.trim() || defaultBaseUrlForApiFormat(apiFormat)),
         apiKey: channel?.apiKey || "",
         apiFormat,
         models: normalizeChannelModels(channel?.models),
@@ -565,6 +566,17 @@ function normalizeChannels(config: AiConfig) {
     );
     // 不再自动创建默认渠道，允许渠道列表为空
     return channels;
+}
+
+/** Update saved service URLs without changing unrelated providers or model settings. */
+function updateDefaultApiBaseUrl(baseUrl: string) {
+    try {
+        const url = new URL(baseUrl);
+        if (url.origin !== "https://api.panlai.me") return baseUrl;
+        return `${PANLAI_API_ORIGIN}${url.pathname === "/" ? "" : url.pathname}${url.search}${url.hash}`;
+    } catch {
+        return baseUrl;
+    }
 }
 
 export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {

@@ -2,7 +2,7 @@ import axios from "axios";
 import type { AiConfig, ApiCallFormat, ModelChannel } from "@/stores/use-config-store";
 import { createModelChannel, normalizeChannelModels, resolveApiBaseUrl } from "@/stores/use-config-store";
 
-export const SUB2API_URL = "https://api.panlai.me";
+export const SUB2API_URL = "https://server.panlai.me";
 export const USER_INFO_REFRESH_EVENT = "infinite-canvas:refresh-user-info";
 
 /** Ask the app shell to refresh the logged-in user's balance without coupling API services to UI state. */
