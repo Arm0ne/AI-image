@@ -2,5 +2,5 @@ services:
   docs:
     image: ghcr.io/arm0ne/ai-image-docs:latest
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     restart: unless-stopped

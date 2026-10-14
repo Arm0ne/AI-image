@@ -15,11 +15,15 @@ cd AI-image
 docker compose up -d
 ```
 
-启动后访问：
+启动后在服务器本机访问：
 
 ```text
 http://localhost:3000
 ```
+
+Compose 默认只把端口绑定到 `127.0.0.1`。生产环境请让运行在同一宿主机上的 Nginx、Caddy 或其他反向代理通过 HTTPS 域名转发到 `http://127.0.0.1:3000`。如果反向代理也在独立容器内，应通过共享 Docker 网络转发到应用服务的 3000 端口；该容器中的 `127.0.0.1` 不指向宿主机。
+
+更新端口绑定后需重新创建容器，执行对应的 `docker compose up -d` 命令即可，单独重启旧容器不会应用新映射。此设置限制公网直连应用端口；如需阻止直接通过 IP 访问 80/443 端口，还应在外层反向代理中拒绝未匹配域名的请求。
 
 ## 本地构建镜像
 
@@ -32,6 +36,8 @@ docker compose -f docker-compose.local.yml up -d --build
 ## 文档站镜像
 
 文档站位于 `docs/` 目录，按带服务端能力的 Next.js standalone 应用单独构建，不打进主应用镜像。
+
+文档站同样只绑定宿主机 `127.0.0.1:3001`，域名反向代理应使用对应端口。
 
 使用发布镜像：
 
@@ -69,7 +75,7 @@ services:
   app:
     image: ghcr.io/arm0ne/ai-image:latest
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       ANALYTICS_GA4_ID: G-XXXXXXXXXX
       ANALYTICS_BAIDU_ID: e8263761cc5c32f5f7a855b8203b965a
@@ -78,7 +84,7 @@ services:
 或使用 `docker run`：
 
 ```bash
-docker run -d -p 3000:3000 \
+docker run -d -p 127.0.0.1:3000:3000 \
   -e ANALYTICS_GA4_ID=G-XXXXXXXXXX \
   -e ANALYTICS_BAIDU_ID=e8263761cc5c32f5f7a855b8203b965a \
   ghcr.io/arm0ne/ai-image:latest

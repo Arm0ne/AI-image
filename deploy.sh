@@ -63,7 +63,7 @@ echo ""
 echo -e "${YELLOW}[5/6]${NC} 启动容器..."
 docker run -d \
   --name infinite-canvas \
-  -p 3000:3000 \
+  -p 127.0.0.1:3000:3000 \
   --restart unless-stopped \
   infinite-canvas:custom
 
@@ -81,8 +81,8 @@ if docker ps | grep -q infinite-canvas; then
     echo "=========================================="
     echo ""
     echo "访问地址："
-    echo "  http://localhost:3000"
-    echo "  http://$(hostname -I | awk '{print $1}'):3000"
+    echo "  服务器本机: http://127.0.0.1:3000"
+    echo "  反向代理目标: http://127.0.0.1:3000"
     echo ""
     echo "常用命令："
     echo "  查看日志: docker logs infinite-canvas"

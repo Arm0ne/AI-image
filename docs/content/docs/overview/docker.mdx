@@ -13,7 +13,11 @@ cd AI-image
 docker compose up -d
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000` on the server itself.
+
+Compose binds the application port to `127.0.0.1` by default. In production, route your HTTPS domain through Nginx, Caddy, or another reverse proxy running on the same host to `http://127.0.0.1:3000`. If the proxy runs in a separate container, use a shared Docker network and forward to the app service on port 3000; the proxy container's `127.0.0.1` does not refer to the host.
+
+Recreate existing containers with the corresponding `docker compose up -d` command to apply the binding change; restarting a container alone does not change its port mappings. This restricts direct public access to the application port. To reject IP-based access on ports 80/443 as well, configure the outer reverse proxy to reject requests with unmatched hostnames.
 
 ## Build locally
 
@@ -24,6 +28,8 @@ docker compose -f docker-compose.local.yml up -d --build
 ## Documentation image
 
 The documentation in `docs/` is a separate Next.js standalone application with server capabilities.
+
+Its host port is also bound to loopback at `127.0.0.1:3001`; use that port for its domain's reverse proxy.
 
 ```bash
 cd docs
@@ -53,7 +59,7 @@ services:
   app:
     image: ghcr.io/arm0ne/ai-image:latest
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       ANALYTICS_GA4_ID: G-XXXXXXXXXX
       ANALYTICS_BAIDU_ID: e8263761cc5c32f5f7a855b8203b965a

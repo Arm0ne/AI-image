@@ -7,6 +7,7 @@ description: Implemented changes that still need manual verification
 
 The current release needs manual verification in these areas:
 
+- Docker port binding: start the main app with `docker compose up -d` or `./deploy.sh` and confirm the container is reachable on the server at `127.0.0.1:3000` but not through the server's public IP and port; verify the production reverse proxy can still forward the domain to `http://127.0.0.1:3000`. If the documentation site is deployed, apply the same check to `127.0.0.1:3001`.
 - Image model refresh: after login records a successful sync, reopening the app, switching tabs, or entering a page after 24 hours should run one background sync; a failure should not retry within five minutes or clear the cached catalog, while the manual sync action should still refresh immediately.
 - Docker runtime upgrade: build and deploy the main application with `nginx:1.30.5-alpine`; verify container startup, static assets, direct navigation and refresh on `/image` and `/canvas`, and successful responses for `config.js` and `version.json`.
 - Upstream v0.19.0 integration: verify canvas images, expanded image groups, element lists, reference bars, asset cards and workbench results use local WebP previews, while zoomed previews, downloads, exports, generation inputs and WebDAV still use originals. Existing canvases/assets/history must remain readable without resetting browser storage. Image history should remain lazy and reuse cached previews only when cards approach the viewport; legacy inline images should still display.
